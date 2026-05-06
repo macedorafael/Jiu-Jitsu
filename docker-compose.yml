@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./academia.db:/app/academia.db
+    environment:
+      - DATABASE_URL=sqlite:///./academia.db
+      - UPLOAD_DIR=/app/uploads
+      - SECRET_KEY=${SECRET_KEY:-mude-em-producao}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

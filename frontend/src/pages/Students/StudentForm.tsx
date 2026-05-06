@@ -1,0 +1,248 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { studentsApi, feesApi, Student, Belt } from '../../api/client'
+import { X, Info, DollarSign } from 'lucide-react'
+
+const BELTS: Belt[] = ['white', 'grey', 'yellow', 'orange', 'green', 'blue', 'purple', 'brown', 'black']
+const BELT_LABELS: Record<Belt, string> = {
+  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
+  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
+}
+
+const PAYMENT_METHODS = ['Pix', 'Boleto', 'Cartão de crédito', 'Cartão de débito', 'Dinheiro']
+
+interface FormData {
+  name: string
+  email: string
+  belt: Belt
+  degree: number
+  birth_date: string
+  phone: string
+  enrollment_date: string
+  // plano de mensalidade (opcional no cadastro)
+  fee_amount: string
+  fee_due_day: string
+  fee_payment_method: string
+}
+
+export default function StudentForm({
+  student, onClose, onSaved,
+}: { student: Student | null; onClose: () => void; onSaved: () => void }) {
+  const isNew = !student
+  const [withFeePlan, setWithFeePlan] = useState(false)
+
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+    defaultValues: {
+      name: student?.name ?? '',
+      email: student?.email ?? '',
+      belt: student?.belt ?? 'white',
+      degree: student?.degree ?? 0,
+      birth_date: student?.birth_date ?? '',
+      phone: student?.phone ?? '',
+      enrollment_date: student?.enrollment_date ?? new Date().toISOString().split('T')[0],
+      fee_amount: '',
+      fee_due_day: '10',
+      fee_payment_method: 'Pix',
+    },
+  })
+
+  async function onSubmit(data: FormData) {
+    try {
+      if (student) {
+        // Edição: envia apenas campos preenchidos, converte tipos corretamente
+        await studentsApi.update(student.id, {
+          name: data.name,
+          belt: data.belt,
+          degree: Number(data.degree),
+          enrollment_date: data.enrollment_date || undefined,
+          birth_date: data.birth_date || undefined,
+          phone: data.phone || undefined,
+        })
+      } else {
+        // Cadastro: cria aluno (+ usuário automático) e, opcionalmente, o plano de mensalidade
+        const created = await studentsApi.create({
+          name: data.name,
+          email: data.email,
+          belt: data.belt,
+          degree: Number(data.degree),
+          birth_date: data.birth_date || undefined,
+          phone: data.phone || undefined,
+          enrollment_date: data.enrollment_date || undefined,
+        })
+
+        // Cria plano de mensalidade se solicitado
+        if (withFeePlan && data.fee_amount && data.fee_due_day) {
+          const amount = parseFloat(data.fee_amount)
+          const due_day = parseInt(data.fee_due_day)
+          if (amount > 0 && due_day >= 1 && due_day <= 31) {
+            await feesApi.createPlan(created.data.id, {
+              amount,
+              due_day,
+              payment_method: data.fee_payment_method || undefined,
+            })
+          }
+        }
+      }
+      onSaved()
+    } catch (err: any) {
+      const detail = err.response?.data?.detail
+      if (Array.isArray(detail)) {
+        // Erros de validação Pydantic: mostra campo + mensagem
+        const msgs = detail.map((e: any) => {
+          const field = e.loc?.slice(-1)[0] ?? ''
+          return field ? `${field}: ${e.msg}` : e.msg
+        }).join('\n')
+        alert(msgs)
+      } else {
+        alert(detail ?? 'Erro ao salvar')
+      }
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
+          <h2 className="text-lg font-semibold">{student ? 'Editar aluno' : 'Novo aluno'}</h2>
+          <button onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 overflow-y-auto">
+
+          {/* ── Dados pessoais ── */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Nome completo *</label>
+            <input className="input" {...register('name', { required: true })} />
+            {errors.name && <p className="text-red-500 text-xs mt-1">Obrigatório</p>}
+          </div>
+
+          {/* Email: apenas leitura na edição, obrigatório no cadastro */}
+          {!isNew && student?.email && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Email (conta de acesso)</label>
+              <input
+                type="email"
+                className="input bg-gray-50 text-gray-500 cursor-not-allowed"
+                value={student.email}
+                readOnly
+              />
+            </div>
+          )}
+
+          {isNew && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Email *</label>
+              <input
+                type="email"
+                className="input"
+                placeholder="email@exemplo.com"
+                {...register('email', { required: true })}
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">Email obrigatório</p>}
+              <div className="flex items-start gap-1.5 mt-1.5">
+                <Info size={12} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-600">
+                  Será criada uma conta de acesso com senha padrão <strong>aluno123</strong>. O aluno deverá alterá-la no primeiro login.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Faixa</label>
+              <select className="input" {...register('belt')}>
+                {BELTS.map((b) => <option key={b} value={b}>{BELT_LABELS[b]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Grau (0-4)</label>
+              <input type="number" min={0} max={4} className="input" {...register('degree', { min: 0, max: 4 })} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Data de nascimento</label>
+              <input type="date" className="input" {...register('birth_date')} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Data de matrícula</label>
+              <input type="date" className="input" {...register('enrollment_date')} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Telefone / WhatsApp</label>
+            <input className="input" placeholder="(67) 99999-9999" {...register('phone')} />
+          </div>
+
+          {/* ── Plano de mensalidade (apenas no cadastro) ── */}
+          {isNew && (
+            <div className="border-t pt-4">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded accent-primary-600"
+                  checked={withFeePlan}
+                  onChange={(e) => setWithFeePlan(e.target.checked)}
+                />
+                <div className="flex items-center gap-1.5">
+                  <DollarSign size={15} className="text-primary-500" />
+                  <span className="text-sm font-medium">Definir plano de mensalidade agora</span>
+                </div>
+              </label>
+
+              {withFeePlan && (
+                <div className="mt-3 bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-gray-600">Valor mensal (R$) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        className="input"
+                        placeholder="150,00"
+                        {...register('fee_amount', { required: withFeePlan })}
+                      />
+                      {errors.fee_amount && <p className="text-red-500 text-xs mt-1">Obrigatório</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-gray-600">Dia de vencimento *</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        className="input"
+                        placeholder="10"
+                        {...register('fee_due_day', { required: withFeePlan, min: 1, max: 31 })}
+                      />
+                      {errors.fee_due_day && <p className="text-red-500 text-xs mt-1">1–31</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-gray-600">Forma de pagamento</label>
+                    <select className="input" {...register('fee_payment_method')}>
+                      <option value="">Selecione...</option>
+                      {PAYMENT_METHODS.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

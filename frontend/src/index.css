@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+    font-family: system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
+}
+
+@layer components {
+  /* ── Botões ── */
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 active:bg-primary-700
+           text-white font-semibold px-4 py-2 rounded-lg
+           transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-sm hover:shadow;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 active:bg-gray-100
+           text-gray-700 font-medium px-4 py-2 rounded-lg
+           border border-gray-200 transition-all duration-150
+           shadow-sm;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 active:bg-red-800
+           text-white font-semibold px-4 py-2 rounded-lg
+           transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Inputs ── */
+  .input {
+    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+           bg-white
+           focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500
+           transition-colors duration-150
+           placeholder:text-gray-400;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
+  }
+
+  /* ── Badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  /* ── Divisor GB ── */
+  .gb-divider {
+    @apply border-t border-gray-100;
+  }
+
+  /* ── Tabela ── */
+  .table-row-hover {
+    @apply hover:bg-gray-50 transition-colors duration-100;
+  }
+}
