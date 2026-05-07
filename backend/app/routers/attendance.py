@@ -13,6 +13,7 @@ from app.schemas import (
     ManualSessionCreate, ManualAttendanceAdd,
     DetectResult, TempRecognizedOut, TempUnidentifiedOut,
     ConfirmAttendanceItem, ConfirmSessionCreate,
+    StudentAttendanceSummaryOut,
 )
 from app.auth import require_professor_up, get_current_user
 from app.services.face_service import detect_and_crop_faces, get_face_encoding, match_face, save_face_crop, encode_face_from_crop_bytes
@@ -173,10 +174,10 @@ def confirm_session(
         )
         db.add(att)
 
-        # Salva foto de perfil se aluno ainda não tem e veio um recorte
+        # Sempre atualiza a foto do aluno com o recorte mais recente da chamada
         if item.face_image_path:
             student = db.get(Student, item.student_id)
-            if student and not student.photo_path and os.path.exists(item.face_image_path):
+            if student and os.path.exists(item.face_image_path):
                 student.photo_path = item.face_image_path
                 try:
                     with open(item.face_image_path, "rb") as fh:
@@ -321,6 +322,59 @@ def list_sessions(
         )
     sessions = q.order_by(TrainingSession.date.desc()).all()
     return [_session_to_out(s) for s in sessions]
+
+
+@router.get("/student-summary", response_model=list[StudentAttendanceSummaryOut])
+def student_attendance_summary(
+    from_date: str = "",
+    to_date: str = "",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_professor_up),
+):
+    """Retorna contagem de presenças por aluno no período."""
+    from sqlalchemy import func
+    from app.models import UserRole
+
+    q = (
+        db.query(
+            Student.id,
+            Student.name,
+            Student.photo_path,
+            Student.belt,
+            func.count(Attendance.id).label("attendance_count"),
+        )
+        .join(Attendance, Attendance.student_id == Student.id)
+        .join(TrainingSession, TrainingSession.id == Attendance.session_id)
+        .filter(Student.active == True)
+    )
+
+    if current_user.role != UserRole.root:
+        q = q.filter(TrainingSession.school_id == current_user.school_id)
+
+    if from_date:
+        try:
+            q = q.filter(TrainingSession.date >= date.fromisoformat(from_date))
+        except ValueError:
+            pass
+
+    if to_date:
+        try:
+            q = q.filter(TrainingSession.date <= date.fromisoformat(to_date))
+        except ValueError:
+            pass
+
+    rows = q.group_by(Student.id).order_by(func.count(Attendance.id).desc(), Student.name).all()
+
+    return [
+        StudentAttendanceSummaryOut(
+            student_id=r.id,
+            student_name=r.name,
+            photo_path=r.photo_path,
+            belt=r.belt.value if hasattr(r.belt, "value") else str(r.belt),
+            attendance_count=r.attendance_count,
+        )
+        for r in rows
+    ]
 
 
 @router.post("/manual", response_model=SessionOut)

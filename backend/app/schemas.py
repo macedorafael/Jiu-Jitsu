@@ -324,6 +324,14 @@ class ConfirmSessionCreate(BaseModel):
     attendance: list[ConfirmAttendanceItem]
 
 
+class StudentAttendanceSummaryOut(BaseModel):
+    student_id: int
+    student_name: str
+    photo_path: Optional[str] = None
+    belt: str
+    attendance_count: int
+
+
 # ── Fees ──────────────────────────────────────────────────────────────────────
 
 class FeePlanCreate(BaseModel):

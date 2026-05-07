@@ -94,6 +94,14 @@ export interface ConfirmAttendanceItem {
   face_image_path?: string
 }
 
+export interface StudentAttendanceSummary {
+  student_id: number
+  student_name: string
+  photo_path?: string
+  belt: Belt
+  attendance_count: number
+}
+
 export interface ClassSchedule {
   id: number; school_id?: number
   day_of_week: number   // 0=Segunda … 6=Domingo
@@ -244,6 +252,10 @@ export const attendanceApi = {
       '/sessions/confirm',
       { temp_id: tempId, attendance },
     ),
+  studentSummary: (fromDate?: string, toDate?: string) =>
+    api.get<StudentAttendanceSummary[]>('/sessions/student-summary', {
+      params: { from_date: fromDate, to_date: toDate },
+    }),
 }
 
 export const beltsApi = {

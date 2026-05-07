@@ -9,4 +9,13 @@ export default defineConfig({
       '/uploads': 'http://127.0.0.1:8000',
     },
   },
+  preview: {
+    port: 4173,
+    host: true,
+    allowedHosts: true,
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      '/uploads': 'http://127.0.0.1:8000',
+    },
+  },
 })

@@ -43,6 +43,13 @@ function certUrl(path: string) {
   return idx === -1 ? `/uploads/${n}` : `/${n.slice(idx)}`
 }
 
+function photoUrl(path: string | undefined): string | undefined {
+  if (!path) return undefined
+  const n = path.replace(/\\/g, '/')
+  const idx = n.indexOf('uploads/')
+  return idx === -1 ? `/uploads/${n}` : `/${n.slice(idx)}`
+}
+
 export default function AlunoDashboardPage() {
   const [data, setData] = useState<AlunoDashboard | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,13 +82,33 @@ export default function AlunoDashboardPage() {
   const feeInfo = fee_status ? FEE_STATUS[fee_status] ?? FEE_STATUS.no_plan : FEE_STATUS.no_plan
   // Pix sempre visível quando disponível (independente do status de pagamento)
   const showPix = !!pix_copia_cola
+  const studentPhoto = photoUrl(student.photo_path)
+  const initials = student.name.split(' ').map((n) => n[0]).slice(0, 2).join('')
 
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Olá, {student.name.split(' ')[0]} 👋</h1>
-        <p className="text-gray-500 text-sm mt-1">Acompanhe seu progresso na academia</p>
+      <div className="flex items-center gap-4">
+        {/* Foto do aluno */}
+        {studentPhoto ? (
+          <img
+            src={studentPhoto}
+            alt={student.name}
+            className="w-16 h-16 rounded-full object-cover border-4 flex-shrink-0 shadow-md"
+            style={{ borderColor: '#CC0000' }}
+          />
+        ) : (
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 shadow-md border-4 border-white"
+            style={{ backgroundColor: '#CC0000' }}
+          >
+            <span className="text-white font-bold text-xl">{initials}</span>
+          </div>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold">Olá, {student.name.split(' ')[0]} 👋</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Acompanhe seu progresso na academia</p>
+        </div>
       </div>
 
       {/* Cards resumo */}

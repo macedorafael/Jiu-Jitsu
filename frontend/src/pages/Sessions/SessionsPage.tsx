@@ -1,15 +1,32 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   ClipboardList, ChevronDown, ChevronRight, Plus, UserPlus,
-  Camera, Pencil, Calendar, Clock, User, Trash2, X, Search,
+  Camera, Pencil, Calendar, Clock, User, X, Search,
+  BarChart2, List,
 } from 'lucide-react'
 import {
   attendanceApi, schedulesApi, studentsApi,
-  Session, AttendanceResult, ClassSchedule, Student,
+  Session, AttendanceResult, ClassSchedule, Student, StudentAttendanceSummary,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 
 const DAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+
+const BELT_LABELS: Record<string, string> = {
+  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
+  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
+}
+const BELT_COLORS: Record<string, string> = {
+  white: 'bg-gray-100 text-gray-700',
+  grey: 'bg-gray-300 text-gray-800',
+  yellow: 'bg-yellow-100 text-yellow-800',
+  orange: 'bg-orange-100 text-orange-800',
+  green: 'bg-green-100 text-green-800',
+  blue: 'bg-blue-100 text-blue-800',
+  purple: 'bg-purple-100 text-purple-800',
+  brown: 'bg-amber-100 text-amber-800',
+  black: 'bg-gray-800 text-white',
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function photoUrl(path: string | undefined): string | undefined {
@@ -29,6 +46,20 @@ function sessionLabel(s: Session): string {
   if (s.flexible_time) return s.flexible_time
   return 'Horário livre'
 }
+
+/** Retorna data ISO de N meses atrás a partir de hoje */
+function monthsAgo(n: number): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() - n)
+  return d.toISOString().slice(0, 10)
+}
+
+const PERIOD_OPTIONS = [
+  { label: '1 mês', months: 1 },
+  { label: '3 meses', months: 3 },
+  { label: '6 meses', months: 6 },
+  { label: '12 meses', months: 12 },
+]
 
 // ── ManualSessionModal ────────────────────────────────────────────────────────
 interface ManualModalProps {
@@ -190,13 +221,11 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
     }
   }
 
-  // students not yet in attendees
   const presentIds = new Set((attendees ?? []).map((a) => a.student_id))
   const availableStudents = students.filter((s) => !presentIds.has(s.id))
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
-      {/* Header row */}
       <button
         className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left"
         onClick={toggle}
@@ -207,19 +236,16 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
           ) : open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </span>
 
-        {/* date */}
         <span className="flex items-center gap-1.5 font-semibold text-gray-800 min-w-[90px]">
           <Calendar size={14} className="text-primary-400 flex-shrink-0" />
           {formatDate(session.date)}
         </span>
 
-        {/* schedule */}
         <span className="flex items-center gap-1.5 text-sm text-gray-500 flex-1 truncate">
           <Clock size={13} className="flex-shrink-0" />
           {sessionLabel(session)}
         </span>
 
-        {/* professor */}
         {session.professor_name && (
           <span className="hidden sm:flex items-center gap-1.5 text-sm text-gray-500">
             <User size={13} className="flex-shrink-0" />
@@ -227,30 +253,25 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
           </span>
         )}
 
-        {/* photo badge */}
         {session.training_photo_path && (
           <span title="Chamada por foto">
             <Camera size={14} className="text-primary-400" />
           </span>
         )}
 
-        {/* count */}
         <span className="ml-auto flex-shrink-0 bg-primary-100 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full">
           {session.attendance_count} aluno{session.attendance_count !== 1 ? 's' : ''}
         </span>
       </button>
 
-      {/* Detail */}
       {open && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50">
-          {/* notes */}
           {session.notes && (
             <p className="text-xs text-gray-500 italic mb-3 border-l-2 border-primary-300 pl-2">
               {session.notes}
             </p>
           )}
 
-          {/* attendees grid */}
           {attendees === null ? (
             <p className="text-sm text-gray-400">Carregando...</p>
           ) : attendees.length === 0 ? (
@@ -262,7 +283,6 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
                 const initials = a.student_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')
                 return (
                   <div key={a.student_id} className="group relative flex flex-col items-center gap-1.5">
-                    {/* avatar */}
                     <div className="relative">
                       {img ? (
                         <img
@@ -275,13 +295,11 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
                           <span className="text-primary-600 font-bold text-sm">{initials}</span>
                         </div>
                       )}
-                      {/* badge */}
                       {a.confidence_score != null ? (
                         <span className="absolute -bottom-0.5 -right-0.5 bg-green-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center" title="Reconhecido automaticamente">✓</span>
                       ) : (
                         <span className="absolute -bottom-0.5 -right-0.5 bg-gray-400 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center" title="Inserido manualmente">M</span>
                       )}
-                      {/* remove btn (hover) */}
                       {canEdit && (
                         <button
                           className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 items-center justify-center hidden group-hover:flex"
@@ -292,7 +310,6 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
                         </button>
                       )}
                     </div>
-                    {/* name */}
                     <span className="text-[11px] text-gray-700 font-medium text-center leading-tight w-full truncate px-1" title={a.student_name}>
                       {a.student_name.split(' ')[0]}
                     </span>
@@ -302,7 +319,6 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
             </div>
           )}
 
-          {/* add student */}
           {canEdit && (
             <div className="mt-1 pt-2 border-t border-gray-200">
               {addingStudent ? (
@@ -365,6 +381,101 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
   )
 }
 
+// ── StudentSummaryView ────────────────────────────────────────────────────────
+function StudentSummaryView({
+  summary, loading,
+}: {
+  summary: StudentAttendanceSummary[]
+  loading: boolean
+}) {
+  const [search, setSearch] = useState('')
+  const filtered = summary.filter((s) =>
+    s.student_name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  if (loading) {
+    return <div className="text-center py-16 text-gray-400">Carregando...</div>
+  }
+
+  if (summary.length === 0) {
+    return (
+      <div className="card text-center py-16 text-gray-400">
+        <BarChart2 size={36} className="mx-auto mb-3 opacity-30" />
+        <p>Nenhuma presença no período selecionado</p>
+      </div>
+    )
+  }
+
+  const maxCount = Math.max(...summary.map((s) => s.attendance_count), 1)
+
+  return (
+    <div className="space-y-4">
+      {/* Busca */}
+      <div className="relative max-w-xs">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          className="input pl-9 py-1.5 text-sm"
+          placeholder="Buscar aluno..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Totalizador */}
+      <p className="text-sm text-gray-500">
+        <strong className="text-gray-800">{filtered.length}</strong> aluno{filtered.length !== 1 ? 's' : ''} —{' '}
+        <strong className="text-gray-800">{filtered.reduce((a, s) => a + s.attendance_count, 0)}</strong> presenças no período
+      </p>
+
+      {/* Lista */}
+      <div className="space-y-2">
+        {filtered.map((s) => {
+          const img = photoUrl(s.photo_path)
+          const initials = s.student_name.split(' ').map((n) => n[0]).slice(0, 2).join('')
+          const pct = Math.round((s.attendance_count / maxCount) * 100)
+          const beltLabel = BELT_LABELS[s.belt] ?? s.belt
+          const beltColor = BELT_COLORS[s.belt] ?? 'bg-gray-100 text-gray-700'
+
+          return (
+            <div key={s.student_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
+              {/* Avatar */}
+              {img ? (
+                <img src={img} alt={s.student_name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-gray-200" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-primary-600 font-bold text-sm">{initials}</span>
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="font-semibold text-gray-900 truncate">{s.student_name}</span>
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${beltColor}`}>
+                    {beltLabel}
+                  </span>
+                </div>
+                {/* Barra de progresso */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, backgroundColor: '#cc0000' }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold text-gray-700 w-20 text-right whitespace-nowrap">
+                    {s.attendance_count} aula{s.attendance_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SessionsPage() {
   const { user } = useAuth()
@@ -375,13 +486,20 @@ export default function SessionsPage() {
   const [schedules, setSchedules] = useState<ClassSchedule[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Filtros
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
   const [filterName, setFilterName] = useState('')
   const [debouncedName, setDebouncedName] = useState('')
+  const [activePeriod, setActivePeriod] = useState<number | null>(null)
+
+  // Visão
+  const [viewMode, setViewMode] = useState<'sessions' | 'students'>('sessions')
+  const [summary, setSummary] = useState<StudentAttendanceSummary[]>([])
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
   const [showManualModal, setShowManualModal] = useState(false)
 
-  // Debounce do filtro por nome (500ms)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   function handleNameChange(v: string) {
     setFilterName(v)
@@ -389,7 +507,25 @@ export default function SessionsPage() {
     debounceRef.current = setTimeout(() => setDebouncedName(v), 500)
   }
 
-  const load = useCallback(async (nameFilter = '') => {
+  // Aplica período rápido
+  function applyPeriod(months: number) {
+    const from = monthsAgo(months)
+    const to = new Date().toISOString().slice(0, 10)
+    setFilterFrom(from)
+    setFilterTo(to)
+    setActivePeriod(months)
+  }
+
+  function clearAllFilters() {
+    setFilterFrom('')
+    setFilterTo('')
+    setFilterName('')
+    setDebouncedName('')
+    setActivePeriod(null)
+  }
+
+  // Load sessions
+  const loadSessions = useCallback(async (nameFilter = '') => {
     setLoading(true)
     try {
       const [{ data: sess }, { data: studs }, { data: scheds }] = await Promise.all([
@@ -405,28 +541,30 @@ export default function SessionsPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
-  // Re-fetch quando o debounced name muda
-  useEffect(() => { load(debouncedName) }, [debouncedName, load])
+  useEffect(() => { loadSessions() }, [loadSessions])
+  useEffect(() => { loadSessions(debouncedName) }, [debouncedName, loadSessions])
 
-  // ── filtros locais de data ────────────────────────────────────────────────
+  // Load summary whenever view mode switches to 'students' or period changes
+  useEffect(() => {
+    if (viewMode !== 'students') return
+    setSummaryLoading(true)
+    attendanceApi.studentSummary(filterFrom || undefined, filterTo || undefined)
+      .then(({ data }) => setSummary(data))
+      .catch(() => setSummary([]))
+      .finally(() => setSummaryLoading(false))
+  }, [viewMode, filterFrom, filterTo])
+
+  // Filtros locais de data para a lista de sessões
   const filtered = sessions.filter((s) => {
     if (filterFrom && s.date < filterFrom) return false
     if (filterTo && s.date > filterTo) return false
     return true
   })
 
-  function clearAllFilters() {
-    setFilterFrom('')
-    setFilterTo('')
-    setFilterName('')
-    setDebouncedName('')
-  }
-
-  // ── group by month ───────────────────────────────────────────────────────────
+  // Agrupado por mês
   const byMonth: Record<string, Session[]> = {}
   for (const s of filtered) {
-    const key = s.date.slice(0, 7) // "YYYY-MM"
+    const key = s.date.slice(0, 7)
     if (!byMonth[key]) byMonth[key] = []
     byMonth[key].push(s)
   }
@@ -464,39 +602,100 @@ export default function SessionsPage() {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="card mb-6 flex flex-wrap items-end gap-4">
-        {/* Nome do aluno */}
-        <div className="flex-1 min-w-[180px]">
-          <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-            <Search size={11} /> Nome do aluno (opcional)
-          </label>
-          <input type="text" className="input py-1.5 text-sm" placeholder="Buscar por aluno..."
-            value={filterName} onChange={(e) => handleNameChange(e.target.value)} />
+      {/* Filtros */}
+      <div className="card mb-4 space-y-3">
+        {/* Filtros de período rápido */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Período:</span>
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.months}
+              onClick={() => applyPeriod(opt.months)}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                activePeriod === opt.months
+                  ? 'text-white border-transparent'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600'
+              }`}
+              style={activePeriod === opt.months ? { backgroundColor: '#cc0000', borderColor: '#cc0000' } : {}}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {(filterFrom || filterTo) && (
+            <span className="text-xs text-gray-400 ml-1">
+              {filterFrom ? formatDate(filterFrom) : '—'} → {filterTo ? formatDate(filterTo) : '—'}
+            </span>
+          )}
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Data início</label>
-          <input type="date" className="input py-1.5 text-sm"
-            value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+
+        {/* Filtros avançados */}
+        <div className="flex flex-wrap items-end gap-3">
+          {viewMode === 'sessions' && (
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                <Search size={11} /> Nome do aluno
+              </label>
+              <input type="text" className="input py-1.5 text-sm" placeholder="Buscar por aluno..."
+                value={filterName} onChange={(e) => handleNameChange(e.target.value)} />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Data início</label>
+            <input type="date" className="input py-1.5 text-sm"
+              value={filterFrom}
+              onChange={(e) => { setFilterFrom(e.target.value); setActivePeriod(null) }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Data fim</label>
+            <input type="date" className="input py-1.5 text-sm"
+              value={filterTo}
+              onChange={(e) => { setFilterTo(e.target.value); setActivePeriod(null) }} />
+          </div>
+          {(filterFrom || filterTo || filterName) && (
+            <button className="text-sm text-gray-400 hover:text-gray-700 flex items-center gap-1 mb-0.5"
+              onClick={clearAllFilters}>
+              <X size={14} /> Limpar
+            </button>
+          )}
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Data fim</label>
-          <input type="date" className="input py-1.5 text-sm"
-            value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
-        </div>
-        {(filterFrom || filterTo || filterName) && (
-          <button className="text-sm text-gray-400 hover:text-gray-700 flex items-center gap-1 mb-0.5"
-            onClick={clearAllFilters}>
-            <X size={14} /> Limpar filtros
+
+        {/* Toggle de visão */}
+        <div className="flex items-center gap-1 border-t border-gray-100 pt-3">
+          <span className="text-xs font-medium text-gray-500 mr-2">Visualizar:</span>
+          <button
+            onClick={() => setViewMode('sessions')}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              viewMode === 'sessions'
+                ? 'text-white border-transparent'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600'
+            }`}
+            style={viewMode === 'sessions' ? { backgroundColor: '#cc0000', borderColor: '#cc0000' } : {}}
+          >
+            <List size={13} /> Por sessão
           </button>
-        )}
-        <div className="ml-auto text-sm text-gray-400 self-end mb-0.5 whitespace-nowrap">
-          {filtered.length} sessão{filtered.length !== 1 ? 'ões' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
+          <button
+            onClick={() => setViewMode('students')}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              viewMode === 'students'
+                ? 'text-white border-transparent'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600'
+            }`}
+            style={viewMode === 'students' ? { backgroundColor: '#cc0000', borderColor: '#cc0000' } : {}}
+          >
+            <BarChart2 size={13} /> Por aluno
+          </button>
+          {viewMode === 'sessions' && (
+            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">
+              {filtered.length} sessão{filtered.length !== 1 ? 'ões' : ''}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      {loading ? (
+      {/* Conteúdo */}
+      {viewMode === 'students' ? (
+        <StudentSummaryView summary={summary} loading={summaryLoading} />
+      ) : loading ? (
         <div className="text-center py-16 text-gray-400">Carregando...</div>
       ) : filtered.length === 0 ? (
         <div className="card text-center py-16 text-gray-400">
