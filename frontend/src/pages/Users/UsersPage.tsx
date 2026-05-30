@@ -7,6 +7,7 @@ import UserForm from './UserForm'
 const ROLE_LABELS: Record<Role, string> = {
   root: 'Root',
   admin: 'Administrador',
+  admin_especifico: 'Admin Específico',
   professor: 'Professor',
   aluno: 'Aluno',
 }
@@ -14,6 +15,7 @@ const ROLE_LABELS: Record<Role, string> = {
 const ROLE_COLORS: Record<Role, string> = {
   root: 'bg-red-100 text-red-700',
   admin: 'bg-purple-100 text-purple-700',
+  admin_especifico: 'bg-orange-100 text-orange-700',
   professor: 'bg-blue-100 text-blue-700',
   aluno: 'bg-green-100 text-green-700',
 }
@@ -51,8 +53,8 @@ export default function UsersPage() {
 
   // Alunos são criados automaticamente via cadastro de aluno — não aparecem aqui
   const creatableRoles: Role[] = me?.role === 'root'
-    ? ['root', 'admin', 'professor']
-    : ['professor']
+    ? ['root', 'admin', 'admin_especifico', 'professor']
+    : ['admin_especifico', 'professor']
 
   return (
     <div>

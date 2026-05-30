@@ -1,31 +1,146 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Users, Camera, DollarSign, LayoutDashboard, LogOut,
   Building2, UserCog, Settings, User, Clock, ClipboardList,
-  TrendingUp, X,
+  TrendingUp, X, KeyRound, Eye, EyeOff, HelpCircle,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { Role } from '../../api/client'
+import { Role, authApi } from '../../api/client'
+
+// ── Modal de troca de senha ───────────────────────────────────────────────────
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext]       = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+  const [success, setSuccess] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNext, setShowNext]       = useState(false)
+
+  async function handleSave() {
+    setError('')
+    if (next.length < 6)         { setError('A nova senha deve ter pelo menos 6 caracteres.'); return }
+    if (next !== confirm)        { setError('As senhas não coincidem.'); return }
+    if (next === current)        { setError('A nova senha deve ser diferente da atual.'); return }
+    setSaving(true)
+    try {
+      await authApi.changePassword({ current_password: current, new_password: next })
+      setSuccess(true)
+    } catch (e: any) {
+      setError(e.response?.data?.detail ?? 'Erro ao alterar senha.')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <KeyRound size={18} className="text-primary-500" />
+            <h3 className="font-bold text-gray-900">Alterar senha</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {success ? (
+          <div className="text-center py-4 space-y-3">
+            <p className="text-green-600 font-semibold">Senha alterada com sucesso!</p>
+            <button className="btn-primary w-full" onClick={onClose}>Fechar</button>
+          </div>
+        ) : (
+          <>
+            {/* Senha atual */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Senha atual</label>
+              <div className="relative">
+                <input
+                  type={showCurrent ? 'text' : 'password'}
+                  className="input pr-10"
+                  value={current}
+                  onChange={(e) => setCurrent(e.target.value)}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowCurrent((v) => !v)}
+                >
+                  {showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Nova senha */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Nova senha</label>
+              <div className="relative">
+                <input
+                  type={showNext ? 'text' : 'password'}
+                  className="input pr-10"
+                  placeholder="Mínimo 6 caracteres"
+                  value={next}
+                  onChange={(e) => setNext(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowNext((v) => !v)}
+                >
+                  {showNext ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirmar */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirmar nova senha</label>
+              <input
+                type="password"
+                className="input"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              />
+            </div>
+
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+
+            <div className="flex gap-3 pt-1">
+              <button className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>
+              <button className="btn-primary flex-1" onClick={handleSave} disabled={saving || !current || !next || !confirm}>
+                {saving ? 'Salvando...' : 'Alterar senha'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const nav: { to: string; icon: any; label: string; roles: Role[] }[] = [
-  { to: '/',           icon: LayoutDashboard, label: 'Dashboard',     roles: ['root', 'admin', 'professor'] },
+  { to: '/',           icon: LayoutDashboard, label: 'Dashboard',     roles: ['root', 'admin', 'admin_especifico', 'professor'] },
   { to: '/meu-perfil', icon: User,            label: 'Meu Perfil',    roles: ['aluno'] },
   { to: '/schools',    icon: Building2,       label: 'Escolas',       roles: ['root'] },
   { to: '/users',      icon: UserCog,         label: 'Usuários',      roles: ['root', 'admin'] },
-  { to: '/students',   icon: Users,           label: 'Alunos',        roles: ['root', 'admin', 'professor'] },
-  { to: '/schedules',  icon: Clock,           label: 'Horários',      roles: ['root', 'admin'] },
-  { to: '/attendance', icon: Camera,          label: 'Chamada',       roles: ['root', 'admin', 'professor'] },
-  { to: '/sessions',   icon: ClipboardList,   label: 'Presenças',     roles: ['root', 'admin', 'professor'] },
-  { to: '/fees',       icon: DollarSign,      label: 'Mensalidades',  roles: ['root', 'admin'] },
-  { to: '/financeiro', icon: TrendingUp,      label: 'Financeiro',    roles: ['root', 'admin'] },
+  { to: '/students',   icon: Users,           label: 'Alunos',        roles: ['root', 'admin', 'admin_especifico', 'professor'] },
+  { to: '/schedules',  icon: Clock,           label: 'Horários',      roles: ['root', 'admin', 'admin_especifico'] },
+  { to: '/attendance', icon: Camera,          label: 'Chamada',       roles: ['root', 'admin', 'admin_especifico', 'professor'] },
+  { to: '/sessions',   icon: ClipboardList,   label: 'Presenças',     roles: ['root', 'admin', 'admin_especifico', 'professor'] },
+  { to: '/fees',       icon: DollarSign,      label: 'Mensalidades',  roles: ['root', 'admin', 'admin_especifico'] },
+  { to: '/financeiro', icon: TrendingUp,      label: 'Financeiro',    roles: ['root', 'admin', 'admin_especifico'] },
   { to: '/settings',   icon: Settings,        label: 'Configurações', roles: ['admin'] },
+  { to: '/help',       icon: HelpCircle,      label: 'Ajuda',         roles: ['root', 'admin', 'admin_especifico', 'professor', 'aluno'] },
 ]
 
 const ROLE_LABELS: Record<Role, string> = {
-  root:      'Root',
-  admin:     'Administrador',
-  professor: 'Professor',
-  aluno:     'Aluno',
+  root:             'Root',
+  admin:            'Administrador',
+  admin_especifico: 'Admin Específico',
+  professor:        'Professor',
+  aluno:            'Aluno',
 }
 
 interface SidebarProps {
@@ -35,6 +150,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth()
+  const [showChangePwd, setShowChangePwd] = useState(false)
 
   return (
     <>
@@ -129,6 +245,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <button
+            onClick={() => setShowChangePwd(true)}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-white/5 w-full mb-1"
+          >
+            <KeyRound size={15} />
+            Alterar senha
+          </button>
+
+          <button
             onClick={logout}
             className="flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-white/5 w-full"
           >
@@ -137,6 +261,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </button>
         </div>
       </aside>
+
+      {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
     </>
   )
 }

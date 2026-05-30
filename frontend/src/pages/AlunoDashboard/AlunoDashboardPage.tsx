@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Copy, Check, Award, Calendar, DollarSign, QrCode, AlertCircle, CheckCircle, Clock, Download, FileText } from 'lucide-react'
+import { Copy, Check, Award, Calendar, DollarSign, QrCode, AlertCircle, CheckCircle, Clock, Download, FileText, TrendingUp } from 'lucide-react'
 import { alunoApi, AlunoDashboard, Belt } from '../../api/client'
+import { BELT_BG as BELT_COLORS, BELT_PT as BELT_LABELS } from '../../utils/beltConfig'
 
-const BELT_COLORS: Record<Belt, string> = {
-  white: 'bg-gray-100 text-gray-800',
-  grey: 'bg-gray-300 text-gray-800',
-  yellow: 'bg-yellow-100 text-yellow-800',
-  orange: 'bg-orange-100 text-orange-800',
-  green: 'bg-green-100 text-green-800',
-  blue: 'bg-blue-100 text-blue-800',
-  purple: 'bg-purple-100 text-purple-800',
-  brown: 'bg-amber-100 text-amber-800',
-  black: 'bg-gray-800 text-white',
+const ALL_BELT_PT: Record<string, string> = {
+  white: 'Branca',
+  grey_white: 'Cinza e Branca', grey: 'Cinza', grey_black: 'Cinza e Preta',
+  yellow_white: 'Amarela e Branca', yellow: 'Amarela', yellow_black: 'Amarela e Preta',
+  orange_white: 'Laranja e Branca', orange: 'Laranja', orange_black: 'Laranja e Preta',
+  green_white: 'Verde e Branca', green: 'Verde', green_black: 'Verde e Preta',
+  blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
 }
-const BELT_LABELS: Record<Belt, string> = {
-  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
-  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
+
+const BELT_BAR_COLOR: Record<string, string> = {
+  white: '#d1d5db',
+  grey_white: '#9ca3af', grey: '#6b7280', grey_black: '#374151',
+  yellow_white: '#fef08a', yellow: '#facc15', yellow_black: '#ca8a04',
+  orange_white: '#fed7aa', orange: '#fb923c', orange_black: '#c2410c',
+  green_white: '#bbf7d0', green: '#22c55e', green_black: '#15803d',
+  blue: '#3b82f6', purple: '#9333ea', brown: '#92400e', black: '#111827',
 }
 
 const FEE_STATUS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -153,6 +156,97 @@ export default function AlunoDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Progresso de graduação */}
+      {(() => {
+        const { belt_progress_count: count, belt_progress_target: target, belt_next: nextBelt,
+          student_age: age, min_age_for_promotion: minAge } = data
+        const currentBelt = student.belt as string
+        const barColor = BELT_BAR_COLOR[currentBelt] ?? '#6b7280'
+        const nextLabel = nextBelt ? ALL_BELT_PT[nextBelt] : null
+        const currentLabel = ALL_BELT_PT[currentBelt] ?? currentBelt
+
+        if (currentBelt === 'black') return (
+          <div className="card flex items-center gap-4 border-l-4 border-yellow-400">
+            <div className="bg-yellow-100 text-yellow-700 rounded-xl p-3"><TrendingUp size={22} /></div>
+            <div>
+              <p className="text-xs text-gray-500">Graduação</p>
+              <p className="text-sm font-bold text-yellow-700">🏆 Faixa máxima conquistada!</p>
+            </div>
+          </div>
+        )
+
+        return (
+          <div className="card">
+            <h2 className="font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp size={18} className="text-primary-500" />
+              Progresso para a próxima faixa
+            </h2>
+
+            {target == null || target === 0 ? (
+              <p className="text-sm text-gray-400 italic">
+                Meta de presenças não configurada pela academia ainda.
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                  <span className="font-semibold" style={{ color: barColor }}>
+                    {currentLabel}
+                  </span>
+                  {nextLabel && (
+                    <span className="font-semibold text-gray-600">{nextLabel} →</span>
+                  )}
+                </div>
+
+                {/* Barra de progresso */}
+                <div className="relative h-5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${Math.min(100, Math.round(((count ?? 0) / target) * 100))}%`,
+                      backgroundColor: barColor,
+                    }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-700">
+                    {Math.min(100, Math.round(((count ?? 0) / target) * 100))}%
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm text-gray-600">
+                    <strong className="text-gray-900">{count ?? 0}</strong> de{' '}
+                    <strong className="text-gray-900">{target}</strong> presenças
+                  </span>
+                  {(count ?? 0) >= target ? (
+                    <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                      ✓ Apto para graduar!
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">
+                      Faltam {target - (count ?? 0)} presença{target - (count ?? 0) !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                {/* Requisito de idade */}
+                {minAge && (
+                  <div className={`flex items-center gap-2 mt-2 text-sm font-medium ${
+                    age != null && age >= minAge ? 'text-green-600' : age != null ? 'text-red-500' : 'text-gray-400'
+                  }`}>
+                    <span>🎂</span>
+                    {age == null ? (
+                      <span>Idade mínima para próxima faixa: <strong>{minAge} anos</strong> — cadastre sua data de nascimento</span>
+                    ) : age >= minAge ? (
+                      <span>✓ Idade mínima atingida ({age} anos de {minAge} exigidos)</span>
+                    ) : (
+                      <span>✗ Idade mínima: <strong>{minAge} anos</strong> — você tem {age} ano{age !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Pix para pagamento */}
       {showPix && (

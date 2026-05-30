@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Student, FeePlan, FeePayment, User, UserRole
+from typing import Optional
+from app.models import Student, FeePlan, FeePayment, User, UserRole, StudentProfile
 from app.auth import require_admin_up
 
 router = APIRouter(prefix="/api/financeiro", tags=["financeiro"])
@@ -14,11 +15,17 @@ router = APIRouter(prefix="/api/financeiro", tags=["financeiro"])
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _student_ids(db: Session, current_user: User) -> list[int]:
-    """IDs dos alunos visíveis para o usuário (escola ou todos para root)."""
-    q = db.query(Student.id)
+def _student_ids(db: Session, current_user: User, profile: Optional[str] = None) -> list[int]:
+    """IDs dos alunos visíveis para o usuário (escola ou todos para root), com filtro de perfil."""
+    q = db.query(Student.id).filter(Student.active == True)
     if current_user.role != UserRole.root:
         q = q.filter(Student.school_id == current_user.school_id)
+    # admin_especifico: sempre restrito ao seu perfil de acesso
+    effective_profile = profile
+    if current_user.role == UserRole.admin_especifico and current_user.profile_access:
+        effective_profile = current_user.profile_access
+    if effective_profile:
+        q = q.filter(Student.profile == effective_profile)
     return [sid for (sid,) in q.all()]
 
 
@@ -44,11 +51,12 @@ def _last_n_months(n: int) -> list[str]:
 
 @router.get("/summary")
 def get_summary(
+    profile: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_up),
 ):
     """Retorna resumo financeiro: planos ativos, histórico 6 meses, status mês atual."""
-    student_ids = _student_ids(db, current_user)
+    student_ids = _student_ids(db, current_user, profile)
 
     empty_month = {
         "month": date.today().strftime("%Y-%m"),
@@ -112,11 +120,12 @@ def get_summary(
 def list_payments(
     month: str = "",
     status: str = "",
+    profile: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_up),
 ):
-    """Lista pagamentos com filtros de mês e status, enriquecidos com nome do aluno."""
-    student_ids = _student_ids(db, current_user)
+    """Lista pagamentos com filtros de mês, status e perfil de aluno."""
+    student_ids = _student_ids(db, current_user, profile)
     if not student_ids:
         return []
 

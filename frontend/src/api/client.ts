@@ -23,16 +23,45 @@ export default api
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type Role = 'root' | 'admin' | 'professor' | 'aluno'
-export type Belt = 'white' | 'grey' | 'yellow' | 'orange' | 'green' | 'blue' | 'purple' | 'brown' | 'black'
+export type Role = 'root' | 'admin' | 'admin_especifico' | 'professor' | 'aluno'
+export type StudentProfile = 'adulto' | 'infantil'
+export type Belt =
+  | 'white'
+  // Faixas infantis
+  | 'grey_white' | 'grey' | 'grey_black'
+  | 'yellow_white' | 'yellow' | 'yellow_black'
+  | 'orange_white' | 'orange' | 'orange_black'
+  | 'green_white' | 'green' | 'green_black'
+  // Faixas adultas
+  | 'blue' | 'purple' | 'brown' | 'black'
 export type FeeStatus = 'pending' | 'paid' | 'overdue'
 
 export interface School {
   id: number; name: string; phone?: string; pix_key?: string; active: boolean; created_at: string
+  min_attendance_infantil?: number | null
+  min_attendance_blue?: number | null
+  min_attendance_purple?: number | null
+  min_attendance_brown?: number | null
+  min_attendance_black?: number | null
+}
+
+export interface BeltProgressEntry {
+  student_id: number
+  name: string
+  profile: StudentProfile
+  belt: Belt
+  degree: number
+  photo_url?: string
+  attendance_since_promotion: number
+  target_attendance: number | null
+  since_date: string
+  student_age: number | null
+  min_age_for_promotion: number | null
 }
 
 export interface User {
   id: number; name: string; email: string; role: Role
+  profile_access?: StudentProfile
   school_id?: number; school_name?: string; active: boolean
   must_change_password?: boolean; created_at: string
 }
@@ -43,7 +72,8 @@ export interface StudentStatusHistoryEntry {
 }
 
 export interface Student {
-  id: number; name: string; email?: string; belt: Belt; degree: number
+  id: number; name: string; email?: string
+  profile: StudentProfile; belt: Belt; degree: number
   enrollment_date: string; birth_date?: string; phone?: string
   photo_path?: string; active: boolean; created_at: string
   school_id?: number; user_id?: number; attendance_count?: number; belt_history?: BeltHistory[]
@@ -136,6 +166,12 @@ export interface AlunoDashboard {
   pix_key?: string
   pix_qrcode_base64?: string
   pix_copia_cola?: string
+  belt_progress_count?: number | null
+  belt_progress_target?: number | null
+  belt_progress_since?: string
+  belt_next?: string | null
+  student_age?: number | null
+  min_age_for_promotion?: number | null
 }
 
 // ── API helpers ────────────────────────────────────────────────────────────
@@ -170,6 +206,8 @@ export const usersApi = {
 
 export const studentsApi = {
   list: (active = true) => api.get<Student[]>('/students', { params: { active } }),
+  beltProgress: (profile?: string) =>
+    api.get<BeltProgressEntry[]>('/students/belt-progress', { params: profile ? { profile } : {} }),
   get: (id: number) => api.get<Student>(`/students/${id}`),
   create: (data: Partial<Student> & { email: string }) => api.post<Student>('/students', data),
   update: (id: number, data: Partial<Student>) => api.put<Student>(`/students/${id}`, data),
@@ -307,7 +345,8 @@ export interface FinancialPayment {
 }
 
 export const financeiroApi = {
-  summary: () => api.get<FinancialSummary>('/financeiro/summary'),
-  payments: (params?: { month?: string; status?: string }) =>
+  summary: (params?: { profile?: string }) =>
+    api.get<FinancialSummary>('/financeiro/summary', { params }),
+  payments: (params?: { month?: string; status?: string; profile?: string }) =>
     api.get<FinancialPayment[]>('/financeiro/payments', { params }),
 }

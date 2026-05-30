@@ -1,24 +1,107 @@
 import os
 import json
 import uuid
+from typing import Optional
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Student, User, UserRole, Attendance, TrainingSession, ClassSchedule, StudentStatusHistory
+from app.models import Student, User, UserRole, StudentProfile, Attendance, TrainingSession, ClassSchedule, StudentStatusHistory, School, BeltHistory
 from app.schemas import StudentCreate, StudentUpdate, StudentOut, StudentDetail, StudentStatusChange, StudentStatusHistoryOut
 from app.auth import require_professor_up, get_current_user, hash_password
 from app.services.face_service import encode_face_from_bytes
 
 router = APIRouter(prefix="/api/students", tags=["students"])
 
+# ── Regras de idade mínima (Gracie Barra) ─────────────────────────────────────
+# Idade mínima exigida para ser promovido À próxima faixa
+
+# Infantil: idade para RECEBER a próxima faixa
+_INFANTIL_NEXT_MIN_AGE: dict[str, Optional[int]] = {
+    'white':        None,   # → cinza e branca: qualquer idade
+    'grey_white':   None,   # → cinza
+    'grey':         None,   # → cinza e preta
+    'grey_black':   7,      # → amarela e branca
+    'yellow_white': 7,      # → amarela
+    'yellow':       7,      # → amarela e preta
+    'yellow_black': 10,     # → laranja e branca
+    'orange_white': 10,     # → laranja
+    'orange':       10,     # → laranja e preta
+    'orange_black': 13,     # → verde e branca
+    'green_white':  13,     # → verde
+    'green':        13,     # → verde e preta
+    'green_black':  16,     # → azul (adulto)
+}
+
+# Adulto: idade para RECEBER a próxima faixa
+_ADULT_NEXT_MIN_AGE: dict[str, Optional[int]] = {
+    'white':        16,     # → azul
+    'green_white':  13,     # → verde (ainda na progressão verde)
+    'green':        13,     # → verde e preta
+    'green_black':  16,     # → azul
+    'blue':         16,     # → roxa (já tem 16)
+    'purple':       18,     # → marrom
+    'brown':        19,     # → preta
+    'black':        None,   # faixa máxima
+}
+
+
+def _get_min_age_for_promotion(student: Student) -> Optional[int]:
+    """Retorna a idade mínima exigida para o aluno ser promovido da faixa atual."""
+    belt = str(student.belt.value) if hasattr(student.belt, 'value') else str(student.belt)
+    profile = str(student.profile.value) if hasattr(student.profile, 'value') else str(student.profile)
+    if profile == 'infantil':
+        return _INFANTIL_NEXT_MIN_AGE.get(belt)
+    return _ADULT_NEXT_MIN_AGE.get(belt)
+
+
+def _calc_age(birth_date) -> Optional[int]:
+    """Calcula idade atual a partir da data de nascimento."""
+    if not birth_date:
+        return None
+    today = date.today()
+    age = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        age -= 1
+    return age
+
+
+def _get_target_attendance(school: School, student: Student) -> Optional[int]:
+    """Retorna o mínimo de presenças exigido para o aluno ser promovido na faixa atual."""
+    belt = str(student.belt.value) if hasattr(student.belt, 'value') else str(student.belt)
+    profile = str(student.profile.value) if hasattr(student.profile, 'value') else str(student.profile)
+
+    if profile == 'infantil':
+        return school.min_attendance_infantil
+
+    # Adulto: branca → azul
+    if belt == 'white':
+        return school.min_attendance_blue
+    # Variantes verdes (adulto) → progressão interna das faixas verdes (usa meta de coloridas)
+    if belt in ('green_white', 'green'):
+        return school.min_attendance_infantil
+    # verde e preta → azul
+    if belt == 'green_black':
+        return school.min_attendance_blue
+    if belt == 'blue':
+        return school.min_attendance_purple
+    if belt == 'purple':
+        return school.min_attendance_brown
+    if belt == 'brown':
+        return school.min_attendance_black
+    return None  # faixa preta: sem próxima faixa
+
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 
 def _school_filter(query, current_user: User):
-    """Filtra alunos pela escola do usuário. Root vê todos."""
+    """Filtra alunos pela escola do usuário. Root vê todos.
+    admin_especifico e professor com profile_access filtram por perfil."""
     if current_user.role != UserRole.root:
         query = query.filter(Student.school_id == current_user.school_id)
+    if current_user.profile_access and current_user.role in (UserRole.admin_especifico, UserRole.professor):
+        query = query.filter(Student.profile == current_user.profile_access)
     return query
 
 
@@ -30,14 +113,87 @@ def _check_school_access(student: Student, current_user: User):
         raise HTTPException(403, "Acesso não autorizado")
 
 
+@router.get("/belt-progress")
+def get_belt_progress(
+    profile: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_professor_up),
+):
+    """Retorna progresso de presenças de cada aluno ativo em relação à próxima graduação."""
+    if current_user.role == UserRole.root:
+        raise HTTPException(400, "Root não pertence a uma escola específica")
+
+    school = db.get(School, current_user.school_id)
+    if not school:
+        raise HTTPException(404, "Escola não encontrada")
+
+    q = db.query(Student).filter(Student.active == True)
+    q = _school_filter(q, current_user)
+    if profile:
+        q = q.filter(Student.profile == profile)
+    students = q.order_by(Student.name).all()
+
+    result = []
+    for student in students:
+        # Data de referência: última promoção de faixa (não grau) ou matrícula
+        last_belt_change = (
+            db.query(BeltHistory)
+            .filter(BeltHistory.student_id == student.id)
+            .order_by(BeltHistory.awarded_date.desc())
+            .first()
+        )
+        since_date: date = last_belt_change.awarded_date if last_belt_change else student.enrollment_date
+
+        # Conta presenças desde essa data
+        att_count = (
+            db.query(Attendance)
+            .join(TrainingSession, TrainingSession.id == Attendance.session_id)
+            .filter(
+                Attendance.student_id == student.id,
+                TrainingSession.date >= since_date,
+            )
+            .count()
+        )
+
+        target = _get_target_attendance(school, student)
+
+        photo_url = None
+        if student.photo_path:
+            p = student.photo_path.replace("\\", "/")
+            idx = p.find("uploads/")
+            photo_url = f"/{p[idx:]}" if idx != -1 else f"/uploads/{p}"
+
+        student_age = _calc_age(student.birth_date)
+        min_age = _get_min_age_for_promotion(student)
+
+        result.append({
+            "student_id": student.id,
+            "name": student.name,
+            "profile": str(student.profile.value),
+            "belt": str(student.belt.value),
+            "degree": student.degree,
+            "photo_url": photo_url,
+            "attendance_since_promotion": att_count,
+            "target_attendance": target,
+            "since_date": since_date.isoformat(),
+            "student_age": student_age,
+            "min_age_for_promotion": min_age,
+        })
+
+    return result
+
+
 @router.get("", response_model=list[StudentOut])
 def list_students(
     active: bool = True,
+    profile: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
     q = db.query(Student).filter(Student.active == active)
     q = _school_filter(q, current_user)
+    if profile:
+        q = q.filter(Student.profile == profile)
     return q.order_by(Student.name).all()
 
 
@@ -47,6 +203,11 @@ def create_student(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
+    # admin_especifico só pode criar alunos do seu perfil de acesso
+    if current_user.role == UserRole.admin_especifico and current_user.profile_access:
+        if str(data.profile.value) != current_user.profile_access:
+            raise HTTPException(403, f"Você só pode cadastrar alunos do perfil '{current_user.profile_access}'")
+
     # Verifica se já existe usuário com este email
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Já existe um usuário cadastrado com este email")
@@ -111,6 +272,10 @@ def update_student(
     if not student:
         raise HTTPException(404, "Aluno não encontrado")
     _check_school_access(student, current_user)
+    # admin_especifico não pode alterar o perfil do aluno para fora do seu escopo
+    if current_user.role == UserRole.admin_especifico and current_user.profile_access:
+        if data.profile and str(data.profile.value) != current_user.profile_access:
+            raise HTTPException(403, f"Você só pode editar alunos do perfil '{current_user.profile_access}'")
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(student, field, value)
     db.commit()

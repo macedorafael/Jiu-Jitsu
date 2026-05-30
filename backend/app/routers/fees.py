@@ -104,12 +104,20 @@ def register_payment(
     if not plan:
         raise HTTPException(404, "Plano não encontrado")
 
+    # Se já existe registro (criado pelo job de inadimplência), atualiza para pago
     existing = db.query(FeePayment).filter(
-        FeePayment.fee_plan_id == data.fee_plan_id,
+        FeePayment.student_id == data.student_id,
         FeePayment.month_reference == data.month_reference,
     ).first()
+
     if existing:
-        raise HTTPException(400, f"Pagamento para {data.month_reference} já registrado")
+        existing.fee_plan_id  = data.fee_plan_id
+        existing.amount_paid  = data.amount_paid
+        existing.payment_date = data.payment_date or date.today()
+        existing.status       = FeeStatus.paid
+        db.commit()
+        db.refresh(existing)
+        return existing
 
     payment = FeePayment(
         fee_plan_id=data.fee_plan_id,

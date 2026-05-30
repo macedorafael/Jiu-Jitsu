@@ -1,25 +1,49 @@
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Date, ForeignKey, Text, Enum as SAEnum
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, Date, ForeignKey, Text, Enum as SAEnum, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
 from app.database import Base
 
 
+# Re-export para conveniência
+__all__ = ["UserRole", "StudentProfile", "Belt", "FeeStatus",
+           "School", "User", "Student", "ClassSchedule",
+           "TrainingSession", "Attendance", "UnidentifiedFace",
+           "StudentStatusHistory", "BeltHistory", "FeePlan", "FeePayment"]
+
+
 class UserRole(str, enum.Enum):
     root = "root"
     admin = "admin"
+    admin_especifico = "admin_especifico"
     professor = "professor"
     aluno = "aluno"
 
 
+class StudentProfile(str, enum.Enum):
+    adulto = "adulto"
+    infantil = "infantil"
+
+
 class Belt(str, enum.Enum):
+    # Faixas compartilhadas
     white = "white"
+    # Faixas infantis
+    grey_white = "grey_white"
     grey = "grey"
+    grey_black = "grey_black"
+    yellow_white = "yellow_white"
     yellow = "yellow"
+    yellow_black = "yellow_black"
+    orange_white = "orange_white"
     orange = "orange"
+    orange_black = "orange_black"
+    green_white = "green_white"
     green = "green"
+    green_black = "green_black"
+    # Faixas adultas
     blue = "blue"
     purple = "purple"
     brown = "brown"
@@ -41,6 +65,12 @@ class School(Base):
     pix_key: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Requisitos mínimos de presença por categoria de faixa
+    min_attendance_infantil: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_attendance_blue: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_attendance_purple: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_attendance_brown: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_attendance_black: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     users: Mapped[list["User"]] = relationship("User", back_populates="school")
     students: Mapped[list["Student"]] = relationship("Student", back_populates="school")
@@ -54,6 +84,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(150), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), default=UserRole.aluno)
+    profile_access: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "adulto"|"infantil" para admin_especifico
     school_id: Mapped[Optional[int]] = mapped_column(ForeignKey("schools.id"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -73,6 +104,7 @@ class Student(Base):
     school_id: Mapped[Optional[int]] = mapped_column(ForeignKey("schools.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(100), index=True)
     email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    profile: Mapped[StudentProfile] = mapped_column(SAEnum(StudentProfile), default=StudentProfile.adulto)
     belt: Mapped[Belt] = mapped_column(SAEnum(Belt), default=Belt.white)
     degree: Mapped[int] = mapped_column(Integer, default=0)
     enrollment_date: Mapped[date] = mapped_column(Date, default=date.today)

@@ -68,12 +68,17 @@ def create_user(
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Email já cadastrado")
 
+    # admin_especifico obrigatoriamente precisa de profile_access
+    if data.role == UserRole.admin_especifico and not data.profile_access:
+        raise HTTPException(400, "admin_especifico precisa ter um perfil de acesso (adulto ou infantil)")
+
     user = User(
         name=data.name,
         email=data.email,
         password_hash=hash_password(data.password),
         role=data.role,
         school_id=data.school_id,
+        profile_access=data.profile_access if data.role == UserRole.admin_especifico else None,
     )
     db.add(user)
     db.commit()

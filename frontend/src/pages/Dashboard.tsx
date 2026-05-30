@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import api from '../api/client'
+import { BELT_PT, BELT_BG_SOLID, BELT_STRIPE } from '../utils/beltConfig'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DashData {
@@ -30,32 +31,9 @@ interface DashData {
 }
 
 // ── Belt config ────────────────────────────────────────────────────────────────
-const BELT_PT: Record<string, string> = {
-  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
-  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
-}
-const BELT_COLOR: Record<string, string> = {
-  white: 'bg-gray-200 text-gray-700',
-  grey: 'bg-gray-400 text-white',
-  yellow: 'bg-yellow-400 text-gray-900',
-  orange: 'bg-orange-400 text-white',
-  green: 'bg-green-500 text-white',
-  blue: 'bg-blue-500 text-white',
-  purple: 'bg-purple-600 text-white',
-  brown: 'bg-amber-800 text-white',
-  black: 'bg-gray-900 text-white',
-}
-const BELT_BAR: Record<string, string> = {
-  white: 'bg-gray-300',
-  grey: 'bg-gray-400',
-  yellow: 'bg-yellow-400',
-  orange: 'bg-orange-400',
-  green: 'bg-green-500',
-  blue: 'bg-blue-500',
-  purple: 'bg-purple-600',
-  brown: 'bg-amber-800',
-  black: 'bg-gray-900',
-}
+const BELT_COLOR = BELT_BG_SOLID as Record<string, string>
+const BELT_BAR = BELT_STRIPE as Record<string, string>
+const BELT_PT_STR = BELT_PT as Record<string, string>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(iso: string) {
@@ -137,7 +115,7 @@ function BeltChart({ dist, total }: { dist: Record<string, number>; total: numbe
         {belts.map(([belt, count]) => (
           <div key={belt} className="flex items-center gap-2">
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full min-w-[72px] text-center ${BELT_COLOR[belt] ?? 'bg-gray-200'}`}>
-              {BELT_PT[belt] ?? belt}
+              {BELT_PT_STR[belt] ?? belt}
             </span>
             <div className="flex-1 bg-gray-100 rounded-full h-2">
               <div
@@ -204,7 +182,7 @@ function RecentPromotions({ promotions }: { promotions: DashData['recent_belt_pr
         {promotions.map((p, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${BELT_COLOR[p.belt] ?? 'bg-gray-200'}`}>
-              {BELT_PT[p.belt] ?? p.belt}{p.degree > 0 ? ` ${degreeLabel(p.degree)}` : ''}
+              {BELT_PT_STR[p.belt] ?? p.belt}{p.degree > 0 ? ` ${degreeLabel(p.degree)}` : ''}
             </span>
             <span className="flex-1 text-sm font-medium text-gray-800">{p.student_name}</span>
             <span className="text-xs text-gray-400">{fmtDate(p.awarded_date)}</span>
@@ -218,18 +196,28 @@ function RecentPromotions({ promotions }: { promotions: DashData['recent_belt_pr
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { user } = useAuth()
+  const isAdminEspecifico = user?.role === 'admin_especifico'
+  // Professores com profile_access também ficam travados no seu perfil
+  const lockedProfile = user?.profile_access ?? null
+
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileFilter, setProfileFilter] = useState<'all' | 'adulto' | 'infantil'>(
+    (lockedProfile as 'adulto' | 'infantil') ?? 'all'
+  )
 
   const today = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
 
   useEffect(() => {
     if (user?.role === 'aluno') return
-    api.get<DashData>('/dashboard')
+    // admin_especifico: sempre força o perfil de acesso
+    const effective = lockedProfile ?? (profileFilter !== 'all' ? profileFilter : null)
+    const params = effective ? `?profile=${effective}` : ''
+    api.get<DashData>(`/dashboard${params}`)
       .then((r) => setData(r.data))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [user])
+  }, [user, profileFilter])
 
   if (user?.role === 'aluno') return <Navigate to="/meu-perfil" replace />
 
@@ -246,13 +234,43 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Olá, {user?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-gray-500 capitalize mt-0.5 text-sm">{today}</p>
-        {user?.school_name && (
-          <p className="text-primary-600 font-medium text-sm mt-0.5">🏫 {user.school_name}</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Olá, {user?.name?.split(' ')[0]} 👋
+          </h1>
+          <p className="text-gray-500 capitalize mt-0.5 text-sm">{today}</p>
+          {user?.school_name && (
+            <p className="text-primary-600 font-medium text-sm mt-0.5">🏫 {user.school_name}</p>
+          )}
+        </div>
+        {/* Filtro de perfil */}
+        {lockedProfile ? (
+          /* admin_especifico: perfil fixo, não editável */
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 font-medium text-sm ${
+            lockedProfile === 'infantil'
+              ? 'border-blue-300 bg-blue-50 text-blue-700'
+              : 'border-gray-300 bg-gray-50 text-gray-700'
+          }`}>
+            {lockedProfile === 'adulto' ? '🥋 Adulto' : '👦 Infantil'}
+            <span className="text-xs font-normal opacity-60">(fixo)</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 p-1">
+            {(['all', 'adulto', 'infantil'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => { setProfileFilter(p); setLoading(true) }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  profileFilter === p
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                {p === 'all' ? 'Todos' : p === 'adulto' ? '🥋 Adulto' : '👦 Infantil'}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

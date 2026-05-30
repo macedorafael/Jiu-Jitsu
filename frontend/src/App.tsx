@@ -16,6 +16,7 @@ import AlunoDashboardPage from './pages/AlunoDashboard/AlunoDashboardPage'
 import SettingsPage from './pages/Settings/SettingsPage'
 import SchedulesPage from './pages/Schedules/SchedulesPage'
 import SessionsPage from './pages/Sessions/SessionsPage'
+import HelpPage from './pages/Help/HelpPage'
 import { Role } from './api/client'
 
 function ProtectedLayout() {
@@ -91,26 +92,27 @@ export default function App() {
               <RoleRoute roles={['root', 'admin']}><UsersPage /></RoleRoute>
             } />
             <Route path="/students" element={
-              <RoleRoute roles={['root', 'admin', 'professor']}><StudentsPage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico', 'professor']}><StudentsPage /></RoleRoute>
             } />
             <Route path="/attendance" element={
-              <RoleRoute roles={['root', 'admin', 'professor']}><AttendancePage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico', 'professor']}><AttendancePage /></RoleRoute>
             } />
             <Route path="/fees" element={
-              <RoleRoute roles={['root', 'admin']}><FeesPage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico']}><FeesPage /></RoleRoute>
             } />
             <Route path="/financeiro" element={
-              <RoleRoute roles={['root', 'admin']}><FinanceiroPage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico']}><FinanceiroPage /></RoleRoute>
             } />
             <Route path="/schedules" element={
-              <RoleRoute roles={['root', 'admin']}><SchedulesPage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico']}><SchedulesPage /></RoleRoute>
             } />
             <Route path="/sessions" element={
-              <RoleRoute roles={['root', 'admin', 'professor']}><SessionsPage /></RoleRoute>
+              <RoleRoute roles={['root', 'admin', 'admin_especifico', 'professor']}><SessionsPage /></RoleRoute>
             } />
             <Route path="/settings" element={
               <RoleRoute roles={['admin']}><SettingsPage /></RoleRoute>
             } />
+            <Route path="/help" element={<HelpPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

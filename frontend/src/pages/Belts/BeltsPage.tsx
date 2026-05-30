@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Award, Plus, Search } from 'lucide-react'
 import { studentsApi, beltsApi, Student, Belt, BeltHistory } from '../../api/client'
-
-const BELT_LABELS: Record<Belt, string> = {
-  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
-  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
-}
-const BELTS: Belt[] = ['white', 'grey', 'yellow', 'orange', 'green', 'blue', 'purple', 'brown', 'black']
+import { BELT_PT as BELT_LABELS, ALL_BELTS as BELTS } from '../../utils/beltConfig'
 
 export default function BeltsPage() {
   const [students, setStudents] = useState<Student[]>([])
@@ -106,8 +101,8 @@ export default function BeltsPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Grau (0-4)</label>
-                        <input type="number" min={0} max={4} className="input" value={form.degree}
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Grau (0-11)</label>
+                        <input type="number" min={0} max={11} className="input" value={form.degree}
                           onChange={(e) => setForm({ ...form, degree: Number(e.target.value) })} />
                       </div>
                     </div>

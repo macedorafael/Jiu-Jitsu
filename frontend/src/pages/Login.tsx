@@ -52,9 +52,9 @@ export default function Login() {
                 <div
                 className="inline-flex items-center justify-center w-20 h-20 rounded-full font-black text-2xl tracking-widest text-white mb-4"
                 style={{ backgroundColor: '#CC0000' }}
-              >GB</div>
+              >BJJ</div>
               <h1 className="text-2xl font-bold text-gray-900 tracking-wide">
-                GRACIE BARRA
+                Time BUBA
               </h1>
               <p className="text-gray-400 text-sm mt-1 tracking-widest uppercase font-medium">
                 Sistema de Gestão
@@ -117,8 +117,8 @@ export default function Login() {
         </div>
 
         {/* Rodapé */}
-        <p className="text-center text-gray-600 text-xs mt-6 tracking-widest uppercase">
-          Gracie Barra — Os Guerreiros Unidos
+        <p className="text-center text-gray-500 text-xs mt-6 italic">
+          Bem-vindo à honra, disciplina e respeito; bem-vindo ao Jiu-Jitsu
         </p>
       </div>
     </div>

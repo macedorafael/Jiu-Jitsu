@@ -2,7 +2,7 @@ from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
-from app.models import UserRole, Belt, FeeStatus
+from app.models import UserRole, Belt, FeeStatus, StudentProfile
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -31,6 +31,11 @@ class SchoolUpdate(BaseModel):
     phone: Optional[str] = None
     pix_key: Optional[str] = None
     active: Optional[bool] = None
+    min_attendance_infantil: Optional[int] = None
+    min_attendance_blue: Optional[int] = None
+    min_attendance_purple: Optional[int] = None
+    min_attendance_brown: Optional[int] = None
+    min_attendance_black: Optional[int] = None
 
 
 class SchoolOut(BaseModel):
@@ -40,6 +45,11 @@ class SchoolOut(BaseModel):
     pix_key: Optional[str]
     active: bool
     created_at: datetime
+    min_attendance_infantil: Optional[int] = None
+    min_attendance_blue: Optional[int] = None
+    min_attendance_purple: Optional[int] = None
+    min_attendance_brown: Optional[int] = None
+    min_attendance_black: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -52,6 +62,7 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole = UserRole.aluno
     school_id: Optional[int] = None
+    profile_access: Optional[str] = None   # "adulto"|"infantil" para admin_especifico
 
 
 class UserUpdate(BaseModel):
@@ -61,6 +72,7 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     school_id: Optional[int] = None
     active: Optional[bool] = None
+    profile_access: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -68,6 +80,7 @@ class UserOut(BaseModel):
     name: str
     email: str
     role: UserRole
+    profile_access: Optional[str] = None
     school_id: Optional[int]
     school_name: Optional[str] = None
     active: bool
@@ -83,6 +96,7 @@ class UserOut(BaseModel):
             name=user.name,
             email=user.email,
             role=user.role,
+            profile_access=user.profile_access,
             school_id=user.school_id,
             school_name=user.school.name if user.school else None,
             active=user.active,
@@ -96,6 +110,7 @@ class UserOut(BaseModel):
 class StudentCreate(BaseModel):
     name: str
     email: str
+    profile: StudentProfile = StudentProfile.adulto
     belt: Belt = Belt.white
     degree: int = 0
     enrollment_date: Optional[date] = None
@@ -105,13 +120,14 @@ class StudentCreate(BaseModel):
     @field_validator("degree")
     @classmethod
     def degree_range(cls, v: int) -> int:
-        if not 0 <= v <= 4:
-            raise ValueError("Grau deve ser entre 0 e 4")
+        if not 0 <= v <= 11:
+            raise ValueError("Grau deve ser entre 0 e 11")
         return v
 
 
 class StudentUpdate(BaseModel):
     name: Optional[str] = None
+    profile: Optional[StudentProfile] = None
     belt: Optional[Belt] = None
     degree: Optional[int] = None
     enrollment_date: Optional[date] = None
@@ -124,6 +140,7 @@ class StudentOut(BaseModel):
     id: int
     name: str
     email: Optional[str]
+    profile: StudentProfile = StudentProfile.adulto
     belt: Belt
     degree: int
     enrollment_date: date
@@ -171,8 +188,8 @@ class BeltPromote(BaseModel):
     @field_validator("degree")
     @classmethod
     def degree_range(cls, v: int) -> int:
-        if not 0 <= v <= 4:
-            raise ValueError("Grau deve ser entre 0 e 4")
+        if not 0 <= v <= 11:
+            raise ValueError("Grau deve ser entre 0 e 11")
         return v
 
 
@@ -391,3 +408,10 @@ class AlunoDashboard(BaseModel):
     pix_key: Optional[str]
     pix_qrcode_base64: Optional[str]
     pix_copia_cola: Optional[str]
+    # Progresso de graduação
+    belt_progress_count: Optional[int] = None   # presenças desde última graduação
+    belt_progress_target: Optional[int] = None  # meta configurada
+    belt_progress_since: Optional[str] = None   # data de referência ISO
+    belt_next: Optional[str] = None             # próxima faixa (belt enum value)
+    student_age: Optional[int] = None           # idade atual do aluno
+    min_age_for_promotion: Optional[int] = None # idade mínima para próxima faixa

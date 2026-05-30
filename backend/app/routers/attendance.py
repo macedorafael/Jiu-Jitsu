@@ -351,6 +351,10 @@ def student_attendance_summary(
     if current_user.role != UserRole.root:
         q = q.filter(TrainingSession.school_id == current_user.school_id)
 
+    # Professor ou admin_especifico com perfil restrito — filtra por perfil
+    if current_user.profile_access and current_user.role in (UserRole.professor, UserRole.admin_especifico):
+        q = q.filter(Student.profile == current_user.profile_access)
+
     if from_date:
         try:
             q = q.filter(TrainingSession.date >= date.fromisoformat(from_date))
@@ -412,11 +416,20 @@ def create_manual_session(
 def get_session(
     session_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_professor_up),
+    current_user: User = Depends(require_professor_up),
 ):
+    from app.models import UserRole
     session = db.get(TrainingSession, session_id)
     if not session:
         raise HTTPException(404, "Sessão não encontrada")
+
+    # Filtra presenças pelo perfil do professor/admin_especifico (se restrito)
+    attendances = session.attendance
+    if current_user.profile_access and current_user.role in (UserRole.professor, UserRole.admin_especifico):
+        attendances = [
+            a for a in attendances
+            if a.student and str(a.student.profile.value) == current_user.profile_access
+        ]
 
     recognized = [
         AttendanceOut(
@@ -425,7 +438,7 @@ def get_session(
             confidence_score=att.confidence_score,
             photo_path=att.student.photo_path,
         )
-        for att in session.attendance
+        for att in attendances
     ]
     unidentified = [
         UnidentifiedFaceOut(id=u.id, face_image_path=u.face_image_path)
@@ -437,7 +450,7 @@ def get_session(
         date=session.date,
         recognized=recognized,
         unidentified=unidentified,
-        faces_detected=len(session.attendance) + len([u for u in session.unidentified_faces if u.identified_as_student_id is None]),
+        faces_detected=len(recognized) + len(unidentified),
     )
 
 

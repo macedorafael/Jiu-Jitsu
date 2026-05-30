@@ -7,7 +7,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from 'recharts'
-import { financeiroApi, FinancialSummary, FinancialPayment } from '../../api/client'
+import { financeiroApi, FinancialSummary, FinancialPayment, StudentProfile } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 
 // ── formatadores ──────────────────────────────────────────────────────────────
 
@@ -194,32 +195,45 @@ function PaymentsTable({ payments }: { payments: FinancialPayment[] }) {
 // ── Page principal ────────────────────────────────────────────────────────────
 
 export default function FinanceiroPage() {
+  const { user } = useAuth()
+  const isAdminEspecifico = user?.role === 'admin_especifico'
+  // admin_especifico sempre bloqueado no seu perfil
+  const lockedProfile = isAdminEspecifico ? (user?.profile_access ?? null) : null
+
   const [summary, setSummary]   = useState<FinancialSummary | null>(null)
   const [payments, setPayments] = useState<FinancialPayment[]>([])
   const [loadingS, setLoadingS] = useState(true)
   const [loadingP, setLoadingP] = useState(true)
 
-  const [filterMonth,  setFilterMonth]  = useState(() => new Date().toISOString().slice(0, 7))
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterMonth,   setFilterMonth]   = useState(() => new Date().toISOString().slice(0, 7))
+  const [filterStatus,  setFilterStatus]  = useState('')
+  const [filterProfile, setFilterProfile] = useState<StudentProfile | ''>( lockedProfile ?? '')
+
+  const effectiveProfile = lockedProfile ?? (filterProfile || undefined)
 
   // Carrega resumo (fixo: sempre últimos 6 meses)
   useEffect(() => {
     setLoadingS(true)
-    financeiroApi.summary()
+    financeiroApi.summary({ profile: effectiveProfile })
       .then((r) => setSummary(r.data))
       .finally(() => setLoadingS(false))
-  }, [])
+  }, [effectiveProfile])
 
   // Carrega tabela quando filtros mudam
   useEffect(() => {
     setLoadingP(true)
-    financeiroApi.payments({ month: filterMonth || undefined, status: filterStatus || undefined })
+    financeiroApi.payments({
+      month: filterMonth || undefined,
+      status: filterStatus || undefined,
+      profile: effectiveProfile,
+    })
       .then((r) => setPayments(r.data))
       .finally(() => setLoadingP(false))
-  }, [filterMonth, filterStatus])
+  }, [filterMonth, filterStatus, effectiveProfile])
 
   const cm = summary?.current_month
   const totalCm = (cm?.paid ?? 0) + (cm?.pending ?? 0) + (cm?.overdue ?? 0)
+  const totalStudentsCm = (cm?.paid_count ?? 0) + (cm?.pending_count ?? 0) + (cm?.overdue_count ?? 0)
 
   const pieData = cm ? [
     { name: 'Pago',      value: cm.paid_count,    amount: cm.paid },
@@ -248,7 +262,40 @@ export default function FinanceiroPage() {
             Visão geral de mensalidades e recebimentos
           </p>
         </div>
-        {loadingS && <RefreshCw size={18} className="animate-spin text-gray-400" />}
+
+        <div className="flex items-center gap-3">
+          {/* Filtro de perfil — oculto para admin_especifico (já bloqueado) */}
+          {!isAdminEspecifico ? (
+            <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1">
+              {([
+                { value: '', label: 'Todos' },
+                { value: 'adulto', label: '🥋 Adulto' },
+                { value: 'infantil', label: '👦 Infantil' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setFilterProfile(opt.value as StudentProfile | '')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterProfile === opt.value
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className={`px-3 py-1.5 rounded-xl text-sm font-semibold border-2 ${
+              lockedProfile === 'infantil'
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-gray-300 bg-gray-50 text-gray-700'
+            }`}>
+              {lockedProfile === 'infantil' ? '👦 Infantil' : '🥋 Adulto'}
+            </span>
+          )}
+          {loadingS && <RefreshCw size={18} className="animate-spin text-gray-400" />}
+        </div>
       </div>
 
       {/* ── Cards de resumo do mês atual ── */}
@@ -363,7 +410,7 @@ export default function FinanceiroPage() {
                       <div className="text-right">
                         <span className="font-semibold text-gray-800">{brl(d.amount)}</span>
                         <span className="text-xs text-gray-400 ml-1">
-                          ({totalCm > 0 ? Math.round((d.amount / (summary.monthly_expected || 1)) * 100) : 0}%)
+                          ({totalStudentsCm > 0 ? Math.round((d.value / totalStudentsCm) * 100) : 0}%)
                         </span>
                       </div>
                     </div>
@@ -405,7 +452,11 @@ export default function FinanceiroPage() {
           </div>
           <button
             className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
-            onClick={() => { setFilterMonth(new Date().toISOString().slice(0, 7)); setFilterStatus('') }}
+            onClick={() => {
+              setFilterMonth(new Date().toISOString().slice(0, 7))
+              setFilterStatus('')
+              if (!isAdminEspecifico) setFilterProfile('')
+            }}
           >
             Limpar filtros
           </button>

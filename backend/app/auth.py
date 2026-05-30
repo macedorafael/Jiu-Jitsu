@@ -63,9 +63,9 @@ def require_roles(*roles: UserRole):
 
 # Helpers de acesso por perfil
 require_root         = require_roles(UserRole.root)
-require_admin_up     = require_roles(UserRole.root, UserRole.admin)
-require_professor_up = require_roles(UserRole.root, UserRole.admin, UserRole.professor)
-require_any          = require_roles(UserRole.root, UserRole.admin, UserRole.professor, UserRole.aluno)
+require_admin_up     = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico)
+require_professor_up = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico, UserRole.professor)
+require_any          = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico, UserRole.professor, UserRole.aluno)
 
 
 def can_create_role(creator: User, target_role: UserRole) -> bool:
@@ -73,8 +73,8 @@ def can_create_role(creator: User, target_role: UserRole) -> bool:
     if creator.role == UserRole.root:
         return True
     if creator.role == UserRole.admin:
-        return target_role in (UserRole.professor, UserRole.aluno)
-    if creator.role == UserRole.professor:
+        return target_role in (UserRole.admin_especifico, UserRole.professor, UserRole.aluno)
+    if creator.role in (UserRole.admin_especifico, UserRole.professor):
         return target_role == UserRole.aluno
     return False
 

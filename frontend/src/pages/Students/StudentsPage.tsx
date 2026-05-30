@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Plus, Search, Eye, Camera, Edit2, UserX, ChevronLeft, ChevronRight } from 'lucide-react'
-import { studentsApi, Student, Belt } from '../../api/client'
+import { studentsApi, Student, Belt, StudentProfile } from '../../api/client'
 import StudentForm from './StudentForm'
 import StudentPhotoModal from './StudentPhotoModal'
 import StudentDetailModal from './StudentDetailModal'
@@ -10,58 +10,58 @@ const PAGE_SIZE = 15
 
 const BELT_BG: Record<Belt, string> = {
   white: 'bg-gray-100 text-gray-700',
-  grey: 'bg-gray-300 text-gray-800',
-  yellow: 'bg-yellow-100 text-yellow-800',
-  orange: 'bg-orange-100 text-orange-800',
-  green: 'bg-green-100 text-green-800',
+  grey_white: 'bg-gray-200 text-gray-700', grey: 'bg-gray-300 text-gray-800', grey_black: 'bg-gray-400 text-gray-900',
+  yellow_white: 'bg-yellow-50 text-yellow-800', yellow: 'bg-yellow-100 text-yellow-800', yellow_black: 'bg-yellow-200 text-yellow-900',
+  orange_white: 'bg-orange-50 text-orange-800', orange: 'bg-orange-100 text-orange-800', orange_black: 'bg-orange-200 text-orange-900',
+  green_white: 'bg-green-50 text-green-800', green: 'bg-green-100 text-green-800', green_black: 'bg-green-200 text-green-900',
   blue: 'bg-blue-100 text-blue-800',
   purple: 'bg-purple-100 text-purple-800',
   brown: 'bg-amber-100 text-amber-800',
   black: 'bg-gray-800 text-white',
 }
-const BELT_DOT: Record<Belt, string> = {
-  white: 'bg-gray-400', grey: 'bg-gray-500', yellow: 'bg-yellow-500',
-  orange: 'bg-orange-500', green: 'bg-green-600', blue: 'bg-blue-600',
-  purple: 'bg-purple-600', brown: 'bg-amber-800', black: 'bg-white border border-gray-400',
-}
 const BELT_PT: Record<Belt, string> = {
-  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
-  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
+  white: 'Branca',
+  grey_white: 'Cinza e Branca', grey: 'Cinza', grey_black: 'Cinza e Preta',
+  yellow_white: 'Amarela e Branca', yellow: 'Amarela', yellow_black: 'Amarela e Preta',
+  orange_white: 'Laranja e Branca', orange: 'Laranja', orange_black: 'Laranja e Preta',
+  green_white: 'Verde e Branca', green: 'Verde', green_black: 'Verde e Preta',
+  blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
 }
 const BELT_STRIPE: Record<Belt, string> = {
-  white: 'bg-gray-400', grey: 'bg-gray-600', yellow: 'bg-yellow-600',
-  orange: 'bg-orange-700', green: 'bg-green-700', blue: 'bg-blue-800',
-  purple: 'bg-purple-800', brown: 'bg-amber-900', black: 'bg-white',
+  white: 'bg-gray-400',
+  grey_white: 'bg-gray-500', grey: 'bg-gray-600', grey_black: 'bg-gray-700',
+  yellow_white: 'bg-yellow-500', yellow: 'bg-yellow-600', yellow_black: 'bg-yellow-700',
+  orange_white: 'bg-orange-500', orange: 'bg-orange-600', orange_black: 'bg-orange-700',
+  green_white: 'bg-green-500', green: 'bg-green-700', green_black: 'bg-green-800',
+  blue: 'bg-blue-800', purple: 'bg-purple-800', brown: 'bg-amber-900', black: 'bg-white',
 }
 
-// Cor de fundo da linha baseada na faixa (hex para garantir override sobre bg-white do .card)
 const BELT_ROW_BG: Record<Belt, string> = {
-  white:  '#f8fafc',   // slate-50
-  grey:   '#e5e7eb',   // gray-200
-  yellow: '#fefce8',   // yellow-50
-  orange: '#fff7ed',   // orange-50
-  green:  '#f0fdf4',   // green-50
-  blue:   '#eff6ff',   // blue-50
-  purple: '#faf5ff',   // purple-50
-  brown:  '#fffbeb',   // amber-50
-  black:  '#1f2937',   // gray-800
+  white: '#f8fafc',
+  grey_white: '#f3f4f6', grey: '#e5e7eb', grey_black: '#d1d5db',
+  yellow_white: '#fefce8', yellow: '#fef9c3', yellow_black: '#fef08a',
+  orange_white: '#fff7ed', orange: '#ffedd5', orange_black: '#fed7aa',
+  green_white: '#f0fdf4', green: '#dcfce7', green_black: '#bbf7d0',
+  blue: '#eff6ff', purple: '#faf5ff', brown: '#fffbeb', black: '#1f2937',
 }
-// Cor da barra lateral esquerda
 const BELT_ACCENT: Record<Belt, string> = {
-  white:  '#9ca3af',
-  grey:   '#6b7280',
-  yellow: '#eab308',
-  orange: '#f97316',
-  green:  '#16a34a',
-  blue:   '#3b82f6',
-  purple: '#9333ea',
-  brown:  '#92400e',
-  black:  '#374151',
+  white: '#9ca3af',
+  grey_white: '#9ca3af', grey: '#6b7280', grey_black: '#4b5563',
+  yellow_white: '#fbbf24', yellow: '#eab308', yellow_black: '#ca8a04',
+  orange_white: '#fb923c', orange: '#f97316', orange_black: '#ea580c',
+  green_white: '#4ade80', green: '#16a34a', green_black: '#15803d',
+  blue: '#3b82f6', purple: '#9333ea', brown: '#92400e', black: '#374151',
 }
-// Faixas de fundo escuro precisam de texto claro
-const BELT_DARK: Partial<Record<Belt, true>> = { black: true }
+const BELT_DARK: Partial<Record<Belt, true>> = { black: true, grey_black: true }
 
-const BELTS_ORDER: Belt[] = ['white', 'grey', 'yellow', 'orange', 'green', 'blue', 'purple', 'brown', 'black']
+const BELTS_ORDER_ADULTO: Belt[] = ['white', 'blue', 'purple', 'brown', 'black']
+const BELTS_ORDER_INFANTIL: Belt[] = [
+  'white', 'grey_white', 'grey', 'grey_black',
+  'yellow_white', 'yellow', 'yellow_black',
+  'orange_white', 'orange', 'orange_black',
+  'green_white', 'green', 'green_black',
+]
+const ALL_BELTS_ORDER: Belt[] = ['white', 'grey_white', 'grey', 'grey_black', 'yellow_white', 'yellow', 'yellow_black', 'orange_white', 'orange', 'orange_black', 'green_white', 'green', 'green_black', 'blue', 'purple', 'brown', 'black']
 
 function photoUrl(path: string | undefined) {
   if (!path) return undefined
@@ -77,6 +77,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'ativo' | 'pausado'>('all')
+  const [filterProfile, setFilterProfile] = useState<StudentProfile | 'all'>('all')
   const [filterBelt, setFilterBelt] = useState<Belt | 'all'>('all')
   const [filterDegree, setFilterDegree] = useState<number | 'all'>('all')
   const [page, setPage] = useState(1)
@@ -104,14 +105,15 @@ export default function StudentsPage() {
       if (q && !s.name.toLowerCase().includes(q)) return false
       if (filterStatus === 'ativo' && !s.active) return false
       if (filterStatus === 'pausado' && s.active) return false
+      if (filterProfile !== 'all' && s.profile !== filterProfile) return false
       if (filterBelt !== 'all' && s.belt !== filterBelt) return false
       if (filterDegree !== 'all' && s.degree !== filterDegree) return false
       return true
     })
-  }, [students, search, filterStatus, filterBelt, filterDegree])
+  }, [students, search, filterStatus, filterProfile, filterBelt, filterDegree])
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1) }, [search, filterStatus, filterBelt, filterDegree])
+  useEffect(() => { setPage(1) }, [search, filterStatus, filterProfile, filterBelt, filterDegree])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -121,7 +123,8 @@ export default function StudentsPage() {
     if (detailStudent?.id === updated.id) setDetailStudent(updated)
   }
 
-  const hasFilters = search || filterStatus !== 'all' || filterBelt !== 'all' || filterDegree !== 'all'
+  const hasFilters = search || filterStatus !== 'all' || filterProfile !== 'all' || filterBelt !== 'all' || filterDegree !== 'all'
+  const beltOptionsForFilter = filterProfile === 'infantil' ? BELTS_ORDER_INFANTIL : filterProfile === 'adulto' ? BELTS_ORDER_ADULTO : ALL_BELTS_ORDER
 
   return (
     <div>
@@ -150,6 +153,17 @@ export default function StudentsPage() {
 
         {/* Filter row */}
         <div className="flex flex-wrap gap-2">
+          {/* Perfil */}
+          <select
+            className="input text-sm flex-1 min-w-[130px]"
+            value={filterProfile}
+            onChange={(e) => { setFilterProfile(e.target.value as StudentProfile | 'all'); setFilterBelt('all') }}
+          >
+            <option value="all">Todos os perfis</option>
+            <option value="adulto">🥋 Adulto</option>
+            <option value="infantil">👦 Infantil</option>
+          </select>
+
           {/* Status */}
           <select
             className="input text-sm flex-1 min-w-[130px]"
@@ -168,7 +182,7 @@ export default function StudentsPage() {
             onChange={(e) => setFilterBelt(e.target.value as Belt | 'all')}
           >
             <option value="all">Todas as faixas</option>
-            {BELTS_ORDER.map((b) => (
+            {beltOptionsForFilter.map((b) => (
               <option key={b} value={b}>{BELT_PT[b]}</option>
             ))}
           </select>
@@ -180,7 +194,7 @@ export default function StudentsPage() {
             onChange={(e) => setFilterDegree(e.target.value === 'all' ? 'all' : Number(e.target.value))}
           >
             <option value="all">Todos os graus</option>
-            {[0, 1, 2, 3, 4].map((d) => (
+            {Array.from({ length: filterProfile === 'infantil' ? 12 : 5 }, (_, i) => i).map((d) => (
               <option key={d} value={d}>{d === 0 ? 'Sem grau' : `${d}º grau`}</option>
             ))}
           </select>
@@ -189,7 +203,7 @@ export default function StudentsPage() {
           {hasFilters && (
             <button
               className="text-sm px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors"
-              onClick={() => { setSearch(''); setFilterStatus('all'); setFilterBelt('all'); setFilterDegree('all') }}
+              onClick={() => { setSearch(''); setFilterStatus('all'); setFilterProfile('all'); setFilterBelt('all'); setFilterDegree('all') }}
             >
               Limpar filtros
             </button>
@@ -250,6 +264,13 @@ export default function StudentsPage() {
                       <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {s.name}
                       </p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        s.profile === 'infantil'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {s.profile === 'infantil' ? '👦 Infantil' : '🥋 Adulto'}
+                      </span>
                       {!s.active && (
                         <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">
                           Pausado

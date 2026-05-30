@@ -1,10 +1,11 @@
 import { useForm } from 'react-hook-form'
 import { X } from 'lucide-react'
-import { usersApi, User, School, Role } from '../../api/client'
+import { usersApi, User, School, Role, StudentProfile } from '../../api/client'
 
 const ROLE_LABELS: Record<Role, string> = {
   root: 'Root',
   admin: 'Administrador',
+  admin_especifico: 'Admin Específico',
   professor: 'Professor',
   aluno: 'Aluno',
 }
@@ -15,6 +16,7 @@ interface FormData {
   password: string
   role: Role
   school_id: string
+  profile_access: StudentProfile | ''
 }
 
 interface Props {
@@ -35,11 +37,14 @@ export default function UserForm({ user, schools, creatableRoles, currentUser, o
       password: '',
       role: user?.role ?? creatableRoles[0],
       school_id: user?.school_id?.toString() ?? currentUser.school_id?.toString() ?? '',
+      profile_access: user?.profile_access ?? '',
     },
   })
 
   const selectedRole = watch('role')
   const needsSchool = selectedRole !== 'root'
+  const isAdminEspecifico = selectedRole === 'admin_especifico'
+  const needsProfileAccess = selectedRole === 'admin_especifico' || selectedRole === 'professor'
 
   async function onSubmit(data: FormData) {
     try {
@@ -48,6 +53,10 @@ export default function UserForm({ user, schools, creatableRoles, currentUser, o
         email: data.email,
         role: data.role,
         school_id: needsSchool && data.school_id ? Number(data.school_id) : undefined,
+      }
+      if (needsProfileAccess) {
+        if (!data.profile_access) { alert('Selecione o perfil de acesso (adulto ou infantil)'); return }
+        payload.profile_access = data.profile_access
       }
       if (data.password) payload.password = data.password
 
@@ -120,6 +129,41 @@ export default function UserForm({ user, schools, creatableRoles, currentUser, o
               </div>
             )}
           </div>
+
+          {/* Perfil de acesso — para admin_especifico e professor */}
+          {needsProfileAccess && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Perfil de acesso *
+                <span className="text-xs text-gray-400 font-normal ml-1">
+                  ({selectedRole === 'professor' ? 'este professor' : 'este admin'} só verá alunos deste perfil)
+                </span>
+              </label>
+              <div className="flex gap-3">
+                {(['adulto', 'infantil'] as StudentProfile[]).map((p) => {
+                  const val = watch('profile_access')
+                  return (
+                    <label
+                      key={p}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 cursor-pointer font-medium text-sm transition-all ${
+                        val === p
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        value={p}
+                        className="sr-only"
+                        {...register('profile_access')}
+                      />
+                      {p === 'adulto' ? '🥋 Adulto' : '👦 Infantil'}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button type="button" className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>

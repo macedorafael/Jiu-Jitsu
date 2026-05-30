@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   ClipboardList, ChevronDown, ChevronRight, Plus, UserPlus,
   Camera, Pencil, Calendar, Clock, User, X, Search,
-  BarChart2, List,
+  BarChart2, List, Award,
 } from 'lucide-react'
 import {
   attendanceApi, schedulesApi, studentsApi,
   Session, AttendanceResult, ClassSchedule, Student, StudentAttendanceSummary,
+  BeltProgressEntry,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -381,6 +382,221 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
   )
 }
 
+// ── Belt Progress helpers ─────────────────────────────────────────────────────
+const ALL_BELT_LABELS: Record<string, string> = {
+  white: 'Branca',
+  grey_white: 'Cinza e Branca', grey: 'Cinza', grey_black: 'Cinza e Preta',
+  yellow_white: 'Amarela e Branca', yellow: 'Amarela', yellow_black: 'Amarela e Preta',
+  orange_white: 'Laranja e Branca', orange: 'Laranja', orange_black: 'Laranja e Preta',
+  green_white: 'Verde e Branca', green: 'Verde', green_black: 'Verde e Preta',
+  blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
+}
+
+const BELT_BAR_COLOR: Record<string, string> = {
+  white: '#d1d5db',
+  grey_white: '#9ca3af', grey: '#6b7280', grey_black: '#374151',
+  yellow_white: '#fef08a', yellow: '#facc15', yellow_black: '#ca8a04',
+  orange_white: '#fed7aa', orange: '#fb923c', orange_black: '#c2410c',
+  green_white: '#bbf7d0', green: '#22c55e', green_black: '#15803d',
+  blue: '#3b82f6', purple: '#9333ea', brown: '#92400e', black: '#111827',
+}
+
+// Próxima faixa por perfil
+const NEXT_BELT_INFANTIL: Record<string, string> = {
+  white: 'Cinza e Branca',
+  grey_white: 'Cinza', grey: 'Cinza e Preta', grey_black: 'Amarela e Branca',
+  yellow_white: 'Amarela', yellow: 'Amarela e Preta', yellow_black: 'Laranja e Branca',
+  orange_white: 'Laranja', orange: 'Laranja e Preta', orange_black: 'Verde e Branca',
+  green_white: 'Verde', green: 'Verde e Preta', green_black: 'Azul',
+}
+const NEXT_BELT_ADULTO: Record<string, string> = {
+  white: 'Azul',
+  green_white: 'Verde', green: 'Verde e Preta', green_black: 'Azul',
+  blue: 'Roxa', purple: 'Marrom', brown: 'Preta',
+}
+function getNextBeltLabel(belt: string, profile: string): string | undefined {
+  return profile === 'infantil' ? NEXT_BELT_INFANTIL[belt] : NEXT_BELT_ADULTO[belt]
+}
+
+function BeltProgressView({ loading }: { loading: boolean }) {
+  const { user } = useAuth()
+  const isAdminEspecifico = user?.role === 'admin_especifico'
+  const lockedProfile = isAdminEspecifico ? (user?.profile_access ?? null) : null
+
+  const [progress, setProgress] = useState<BeltProgressEntry[]>([])
+  const [progLoading, setProgLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [profileFilter, setProfileFilter] = useState<'all' | 'adulto' | 'infantil'>(
+    (lockedProfile as 'adulto' | 'infantil') ?? 'all'
+  )
+
+  useEffect(() => {
+    setProgLoading(true)
+    studentsApi.beltProgress()
+      .then(({ data }) => setProgress(data))
+      .catch(() => setProgress([]))
+      .finally(() => setProgLoading(false))
+  }, [])
+
+  if (progLoading || loading) {
+    return <div className="text-center py-16 text-gray-400">Carregando evolução...</div>
+  }
+
+  const filtered = progress.filter((p) => {
+    const effectiveFilter = lockedProfile ?? (profileFilter !== 'all' ? profileFilter : null)
+    if (effectiveFilter && p.profile !== effectiveFilter) return false
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  const withTarget = filtered.filter((p) => p.target_attendance != null)
+  const noTarget = filtered.filter((p) => p.target_attendance == null)
+  const sorted = [
+    ...withTarget.sort((a, b) => {
+      const pctA = a.target_attendance! > 0 ? a.attendance_since_promotion / a.target_attendance! : 0
+      const pctB = b.target_attendance! > 0 ? b.attendance_since_promotion / b.target_attendance! : 0
+      return pctB - pctA
+    }),
+    ...noTarget.sort((a, b) => a.name.localeCompare(b.name)),
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-8 py-1.5 text-sm w-52"
+            placeholder="Buscar aluno..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {lockedProfile ? (
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-medium ${
+            lockedProfile === 'infantil' ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-300 bg-gray-50 text-gray-700'
+          }`}>
+            {lockedProfile === 'adulto' ? '🥋 Adulto' : '👦 Infantil'}
+            <span className="opacity-60 font-normal">(fixo)</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-0.5">
+            {(['all', 'adulto', 'infantil'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setProfileFilter(p)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  profileFilter === p ? 'text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                style={profileFilter === p ? { backgroundColor: '#cc0000' } : {}}
+              >
+                {p === 'all' ? 'Todos' : p === 'adulto' ? '🥋 Adulto' : '👦 Infantil'}
+              </button>
+            ))}
+          </div>
+        )}
+        <span className="text-xs text-gray-400">{filtered.length} aluno{filtered.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="card text-center py-12 text-gray-400">
+          <Award size={36} className="mx-auto mb-3 opacity-30" />
+          <p>Nenhum aluno encontrado</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((p) => {
+            const img = p.photo_url
+            const initials = p.name.split(' ').map((n) => n[0]).slice(0, 2).join('')
+            const target = p.target_attendance
+            const count = p.attendance_since_promotion
+            const pct = target && target > 0 ? Math.min(100, Math.round((count / target) * 100)) : null
+            const barColor = BELT_BAR_COLOR[p.belt] ?? '#6b7280'
+            const beltLabel = ALL_BELT_LABELS[p.belt] ?? p.belt
+            const nextLabel = getNextBeltLabel(p.belt, p.profile)
+
+            return (
+              <div key={p.student_id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  {img ? (
+                    <img src={img} alt={p.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0 border border-gray-200" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-primary-600 font-bold text-sm">{initials}</span>
+                    </div>
+                  )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="font-semibold text-gray-900 text-sm truncate">{p.name}</span>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full border text-white flex-shrink-0"
+                        style={{ backgroundColor: barColor, borderColor: barColor }}
+                      >
+                        {beltLabel}{p.degree > 0 ? ` ${'◆'.repeat(p.degree)}` : ''}
+                      </span>
+                    </div>
+
+                    {p.belt === 'black' ? (
+                      <p className="text-xs font-semibold text-yellow-600">🏆 Faixa máxima</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {/* Barra de presenças */}
+                        {target == null ? (
+                          <p className="text-xs text-gray-400 italic">Presenças: meta não configurada</p>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-400 w-12 text-right flex-shrink-0">{beltLabel}</span>
+                              <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                              </div>
+                              <span className="text-[10px] text-gray-400 w-12 flex-shrink-0">{nextLabel ?? '—'}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-14">
+                              <span className="text-xs text-gray-600">{count} de {target} presenças</span>
+                              <span className={`text-xs font-bold ${pct! >= 100 ? 'text-green-600' : 'text-gray-500'}`}>
+                                {pct}%{pct! >= 100 && ' ✓'}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                        {/* Requisito de idade */}
+                        {(() => {
+                          const minAge = p.min_age_for_promotion
+                          const age = p.student_age
+                          if (!minAge) return null
+                          if (age == null) return (
+                            <p className="text-[11px] text-gray-400 italic px-14">
+                              🎂 Idade mín. {minAge} anos — data de nascimento não informada
+                            </p>
+                          )
+                          const ok = age >= minAge
+                          return (
+                            <div className={`flex items-center gap-1.5 px-14 text-[11px] font-medium ${ok ? 'text-green-600' : 'text-red-500'}`}>
+                              <span>{ok ? '✓' : '✗'}</span>
+                              <span>Idade mínima: {minAge} anos</span>
+                              <span className="font-normal text-gray-400">({age} anos)</span>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── StudentSummaryView ────────────────────────────────────────────────────────
 function StudentSummaryView({
   summary, loading,
@@ -494,7 +710,7 @@ export default function SessionsPage() {
   const [activePeriod, setActivePeriod] = useState<number | null>(null)
 
   // Visão
-  const [viewMode, setViewMode] = useState<'sessions' | 'students'>('sessions')
+  const [viewMode, setViewMode] = useState<'sessions' | 'students' | 'evolucao'>('sessions')
   const [summary, setSummary] = useState<StudentAttendanceSummary[]>([])
   const [summaryLoading, setSummaryLoading] = useState(false)
 
@@ -684,6 +900,17 @@ export default function SessionsPage() {
           >
             <BarChart2 size={13} /> Por aluno
           </button>
+          <button
+            onClick={() => setViewMode('evolucao')}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              viewMode === 'evolucao'
+                ? 'text-white border-transparent'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600'
+            }`}
+            style={viewMode === 'evolucao' ? { backgroundColor: '#cc0000', borderColor: '#cc0000' } : {}}
+          >
+            <Award size={13} /> Evolução
+          </button>
           {viewMode === 'sessions' && (
             <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">
               {filtered.length} sessão{filtered.length !== 1 ? 'ões' : ''}
@@ -693,7 +920,9 @@ export default function SessionsPage() {
       </div>
 
       {/* Conteúdo */}
-      {viewMode === 'students' ? (
+      {viewMode === 'evolucao' ? (
+        <BeltProgressView loading={loading} />
+      ) : viewMode === 'students' ? (
         <StudentSummaryView summary={summary} loading={summaryLoading} />
       ) : loading ? (
         <div className="text-center py-16 text-gray-400">Carregando...</div>

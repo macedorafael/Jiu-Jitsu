@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -6,7 +7,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import (
     Student, TrainingSession, Attendance, BeltHistory,
-    FeePayment, FeeStatus, User, UserRole, Belt
+    FeePayment, FeeStatus, User, UserRole, Belt, StudentProfile
 )
 from app.auth import require_professor_up
 
@@ -15,13 +16,18 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 _DAYS_PT = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
 BELT_ORDER = [
-    Belt.white, Belt.grey, Belt.yellow, Belt.orange, Belt.green,
+    Belt.white,
+    Belt.grey_white, Belt.grey, Belt.grey_black,
+    Belt.yellow_white, Belt.yellow, Belt.yellow_black,
+    Belt.orange_white, Belt.orange, Belt.orange_black,
+    Belt.green_white, Belt.green, Belt.green_black,
     Belt.blue, Belt.purple, Belt.brown, Belt.black,
 ]
 
 
 @router.get("")
 def get_dashboard(
+    profile: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
@@ -34,6 +40,13 @@ def get_dashboard(
     if school_id:
         sq = sq.filter(Student.school_id == school_id)
         sessq = sessq.filter(TrainingSession.school_id == school_id)
+
+    # Filtro por perfil (admin_especifico e professor com profile_access sempre filtrados)
+    effective_profile = profile
+    if current_user.profile_access and current_user.role in (UserRole.admin_especifico, UserRole.professor):
+        effective_profile = current_user.profile_access
+    if effective_profile:
+        sq = sq.filter(Student.profile == effective_profile)
 
     students = sq.all()
 
@@ -49,10 +62,16 @@ def get_dashboard(
     sessions_week_count = sessq.filter(TrainingSession.date >= week_start).count()
     total_sessions = sessq.count()
 
-    # Presenças do mês
+    # Presenças do mês — filtra por perfil se necessário
     att_month = 0
     for s in sessions_month:
-        att_month += len(s.attendance)
+        if effective_profile:
+            att_month += sum(
+                1 for a in s.attendance
+                if a.student and str(a.student.profile.value) == effective_profile
+            )
+        else:
+            att_month += len(s.attendance)
 
     avg_att = round(att_month / len(sessions_month), 1) if sessions_month else 0
 
@@ -107,6 +126,8 @@ def get_dashboard(
     belt_q = db.query(BeltHistory).join(Student).filter(Student.active == True)
     if school_id:
         belt_q = belt_q.filter(Student.school_id == school_id)
+    if effective_profile:
+        belt_q = belt_q.filter(Student.profile == effective_profile)
     recent_belts = belt_q.order_by(BeltHistory.awarded_date.desc()).limit(4).all()
     recent_belts_out = [
         {
@@ -121,7 +142,7 @@ def get_dashboard(
     # ── Financeiro (admin/root) ───────────────────────────────────────────────
     overdue_count = 0
     pending_count = 0
-    if current_user.role in [UserRole.admin, UserRole.root]:
+    if current_user.role in [UserRole.admin, UserRole.root, UserRole.admin_especifico]:
         fp_q = db.query(FeePayment)
         if school_id:
             fp_q = fp_q.join(Student).filter(Student.school_id == school_id)

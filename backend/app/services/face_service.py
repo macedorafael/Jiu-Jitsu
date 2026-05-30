@@ -159,19 +159,40 @@ def detect_and_crop_faces(image_bytes: bytes) -> list[tuple[np.ndarray, dict]]:
 
 
 def encode_face_from_bytes(image_bytes: bytes) -> Optional[list[float]]:
-    """Extrai encoding de uma foto de referência (foto do aluno). Retorna None se não encontrar rosto."""
+    """
+    Extrai encoding de uma foto de referência (foto do aluno).
+    Tenta múltiplos backends em ordem de precisão.
+    Retorna None se nenhum rosto for encontrado.
+    """
     try:
         from deepface import DeepFace
+        import cv2
+
         img_array = _load_image_from_bytes(image_bytes)
 
-        result = DeepFace.represent(
-            img_path=img_array,
-            model_name="Facenet",
-            enforce_detection=True,
-            detector_backend="opencv",
-        )
-        if result:
-            return result[0]["embedding"]
+        # Redimensiona se necessário (mínimo 160px para FaceNet)
+        MIN_SIZE = 160
+        h, w = img_array.shape[:2]
+        if h < MIN_SIZE or w < MIN_SIZE:
+            scale = max(MIN_SIZE / h, MIN_SIZE / w)
+            img_array = cv2.resize(img_array, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+
+        # Tenta backends em ordem de precisão
+        for backend in ["retinaface", "mtcnn", "opencv"]:
+            try:
+                result = DeepFace.represent(
+                    img_path=img_array,
+                    model_name="Facenet",
+                    enforce_detection=True,
+                    detector_backend=backend,
+                )
+                if result and result[0].get("embedding"):
+                    logger.info("encode_face_from_bytes: rosto encontrado com backend '%s'", backend)
+                    return result[0]["embedding"]
+            except Exception as exc:
+                logger.debug("Backend '%s' falhou: %s", backend, exc)
+
+        logger.warning("encode_face_from_bytes: nenhum rosto detectado com nenhum backend")
         return None
     except Exception as e:
         logger.error("encode_face_from_bytes falhou: %s", e, exc_info=False)

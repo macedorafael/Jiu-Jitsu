@@ -2,15 +2,16 @@ import { useEffect, useState, useRef } from 'react'
 import {
   X, User, Phone, Mail, Calendar, Award, Camera,
   CheckCircle, DollarSign, Pause, Play, History,
-  Upload, Download, Trash2, FileText, RefreshCw,
+  Upload, Download, Trash2, FileText, RefreshCw, TrendingUp,
 } from 'lucide-react'
 import { format, parseISO, differenceInYears } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
   studentsApi, beltsApi, feesApi,
-  Student, BeltHistory, FeePlan, Payment, Belt, StudentStatusHistoryEntry,
+  Student, BeltHistory, FeePlan, Payment, Belt, StudentStatusHistoryEntry, BeltProgressEntry,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import { BELT_PT, BELT_BG_SOLID as BELT_BG, BELT_STRIPE } from '../../utils/beltConfig'
 
 type Tab = 'dados' | 'presencas' | 'faixas' | 'mensalidades'
 
@@ -19,23 +20,7 @@ interface AttRecord {
   confidence_score?: number; auto: boolean
 }
 
-// ── belt config ───────────────────────────────────────────────────────────────
-const BELT_PT: Record<Belt, string> = {
-  white: 'Branca', grey: 'Cinza', yellow: 'Amarela', orange: 'Laranja',
-  green: 'Verde', blue: 'Azul', purple: 'Roxa', brown: 'Marrom', black: 'Preta',
-}
-const BELT_BG: Record<Belt, string> = {
-  white: 'bg-gray-200 text-gray-800', grey: 'bg-gray-400 text-white',
-  yellow: 'bg-yellow-400 text-gray-900', orange: 'bg-orange-500 text-white',
-  green: 'bg-green-500 text-white', blue: 'bg-blue-600 text-white',
-  purple: 'bg-purple-600 text-white', brown: 'bg-amber-800 text-white',
-  black: 'bg-gray-900 text-white',
-}
-const BELT_STRIPE: Record<Belt, string> = {
-  white: 'bg-gray-400', grey: 'bg-gray-600', yellow: 'bg-yellow-600',
-  orange: 'bg-orange-700', green: 'bg-green-700', blue: 'bg-blue-800',
-  purple: 'bg-purple-800', brown: 'bg-amber-900', black: 'bg-white',
-}
+// ── belt config imported from shared utils ─────────────────────────────────
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function photoUrl(path?: string) {
@@ -87,6 +72,27 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 
 const BELTS_ORDER: Belt[] = ['white', 'grey', 'yellow', 'orange', 'green', 'blue', 'purple', 'brown', 'black']
+
+const NEXT_BELT_ADULTO: Record<string, string> = {
+  white: 'Azul',
+  green_white: 'Verde', green: 'Verde e Preta', green_black: 'Azul',
+  blue: 'Roxa', purple: 'Marrom', brown: 'Preta',
+}
+const NEXT_BELT_INFANTIL: Record<string, string> = {
+  white: 'Cinza e Branca',
+  grey_white: 'Cinza', grey: 'Cinza e Preta', grey_black: 'Amarela e Branca',
+  yellow_white: 'Amarela', yellow: 'Amarela e Preta', yellow_black: 'Laranja e Branca',
+  orange_white: 'Laranja', orange: 'Laranja e Preta', orange_black: 'Verde e Branca',
+  green_white: 'Verde', green: 'Verde e Preta', green_black: 'Azul',
+}
+const BELT_BAR_COLOR: Record<string, string> = {
+  white: 'bg-gray-300',
+  grey_white: 'bg-gray-400', grey: 'bg-gray-500', grey_black: 'bg-gray-600',
+  yellow_white: 'bg-yellow-300', yellow: 'bg-yellow-400', yellow_black: 'bg-yellow-500',
+  orange_white: 'bg-orange-300', orange: 'bg-orange-400', orange_black: 'bg-orange-500',
+  green_white: 'bg-green-400', green: 'bg-green-500', green_black: 'bg-green-600',
+  blue: 'bg-blue-500', purple: 'bg-purple-600', brown: 'bg-amber-800', black: 'bg-gray-900',
+}
 
 // ── PromoteBeltModal ──────────────────────────────────────────────────────────
 function PromoteBeltModal({
@@ -422,6 +428,7 @@ export default function StudentDetailModal({
   const [feePlan, setFeePlan] = useState<FeePlan | null | 'none'>('none')
   const [payments, setPayments] = useState<Payment[] | null>(null)
   const [statusHistory, setStatusHistory] = useState<StudentStatusHistoryEntry[] | null>(null)
+  const [beltProgress, setBeltProgress] = useState<BeltProgressEntry | null>(null)
 
   const photoRef = useRef<HTMLInputElement>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -442,6 +449,9 @@ export default function StudentDetailModal({
     }
     if (tab === 'dados' && statusHistory === null) {
       studentsApi.statusHistory(student.id).then((r) => setStatusHistory(r.data)).catch(() => setStatusHistory([]))
+      studentsApi.beltProgress(student.profile)
+        .then((r) => setBeltProgress(r.data.find((e) => e.student_id === student.id) ?? null))
+        .catch(() => setBeltProgress(null))
     }
   }, [tab, student.id])
 
@@ -581,6 +591,63 @@ export default function StudentDetailModal({
                   <InfoRow icon={Camera} label="Reconhecimento facial"
                     value={student.photo_path ? 'Foto cadastrada — ativo' : 'Sem foto — envie para ativar'} />
                 </div>
+
+                {/* Progresso de faixa */}
+                {beltProgress && beltProgress.belt !== 'black' && (() => {
+                  const nextBelt = beltProgress.profile === 'infantil'
+                    ? NEXT_BELT_INFANTIL[beltProgress.belt]
+                    : NEXT_BELT_ADULTO[beltProgress.belt]
+                  const target = beltProgress.target_attendance
+                  const count = beltProgress.attendance_since_promotion
+                  const pct = target ? Math.min(100, Math.round((count / target) * 100)) : null
+                  const barColor = BELT_BAR_COLOR[beltProgress.belt] ?? 'bg-primary-500'
+                  const ageOk = beltProgress.min_age_for_promotion == null
+                    || (beltProgress.student_age != null && beltProgress.student_age >= beltProgress.min_age_for_promotion)
+
+                  return (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingUp size={15} className="text-primary-500" />
+                        <span className="text-sm font-semibold text-gray-700">Progresso para próxima faixa</span>
+                        {nextBelt && (
+                          <span className="ml-auto text-xs font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                            → {nextBelt}
+                          </span>
+                        )}
+                      </div>
+
+                      {target ? (
+                        <>
+                          <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                            <span>{count} presenças desde última graduação</span>
+                            <span className="font-semibold text-gray-700">{pct}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                            <div
+                              className={`h-2.5 rounded-full transition-all ${barColor}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            Meta: {count} / {target} presenças
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Meta não configurada nas configurações da escola.</p>
+                      )}
+
+                      {beltProgress.min_age_for_promotion != null && (
+                        <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${ageOk ? 'text-green-600' : 'text-orange-500'}`}>
+                          <span>{ageOk ? '✓' : '✗'}</span>
+                          <span>
+                            Idade mínima: {beltProgress.min_age_for_promotion} anos
+                            {beltProgress.student_age != null && ` (${beltProgress.student_age} anos)`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* Histórico de status */}
                 <div className="pt-2">

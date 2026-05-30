@@ -2,6 +2,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import date
+from dotenv import load_dotenv
+load_dotenv()
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -32,7 +34,7 @@ def check_overdue_fees():
             if not student.active:
                 continue
             payment = db.query(FeePayment).filter(
-                FeePayment.fee_plan_id == plan.id,
+                FeePayment.student_id == student.id,
                 FeePayment.month_reference == current_month,
             ).first()
             if not payment:
@@ -92,6 +94,11 @@ def run_migrations():
         "ALTER TABLE schools ADD COLUMN pix_key VARCHAR(150)",
         "ALTER TABLE belt_history ADD COLUMN certificate_path VARCHAR(300)",
         "ALTER TABLE belt_history ADD COLUMN certificate_name VARCHAR(200)",
+        "ALTER TABLE schools ADD COLUMN min_attendance_infantil INTEGER",
+        "ALTER TABLE schools ADD COLUMN min_attendance_blue INTEGER",
+        "ALTER TABLE schools ADD COLUMN min_attendance_purple INTEGER",
+        "ALTER TABLE schools ADD COLUMN min_attendance_brown INTEGER",
+        "ALTER TABLE schools ADD COLUMN min_attendance_black INTEGER",
     ]
     with engine.connect() as conn:
         for sql in migrations:

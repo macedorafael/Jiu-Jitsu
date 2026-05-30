@@ -55,8 +55,9 @@ def get_dashboard(
         fee_amount = active_plan.amount
         fee_month = current_month
 
+        # Busca por student_id + month_reference para tolerar troca de plano (novo fee_plan_id)
         payment = db.query(FeePayment).filter(
-            FeePayment.fee_plan_id == active_plan.id,
+            FeePayment.student_id == student.id,
             FeePayment.month_reference == current_month,
         ).first()
 
@@ -82,6 +83,32 @@ def get_dashboard(
         except Exception:
             pass
 
+    # ── Progresso de faixa ───────────────────────────────────────────────────
+    from app.routers.students import _get_target_attendance, _get_min_age_for_promotion, _calc_age
+
+    _ADULT_NEXT = {
+        'white': 'blue',
+        'green_white': 'green', 'green': 'green_black', 'green_black': 'blue',
+        'blue': 'purple', 'purple': 'brown', 'brown': 'black',
+    }
+    _INFANTIL_NEXT = {
+        'white': 'grey_white', 'grey_white': 'grey', 'grey': 'grey_black', 'grey_black': 'yellow_white',
+        'yellow_white': 'yellow', 'yellow': 'yellow_black', 'yellow_black': 'orange_white',
+        'orange_white': 'orange', 'orange': 'orange_black', 'orange_black': 'green_white',
+        'green_white': 'green', 'green': 'green_black', 'green_black': 'blue',
+    }
+
+    last_belt_promo = sorted(student.belt_history, key=lambda x: x.awarded_date)[-1] if student.belt_history else None
+    since_date = last_belt_promo.awarded_date if last_belt_promo else student.enrollment_date
+    att_since_count = sum(1 for a in student.attendance if a.session.date >= since_date)
+
+    belt_val = str(student.belt.value)
+    profile_val = str(student.profile.value)
+    belt_target = _get_target_attendance(school, student) if school else None
+    belt_next = _ADULT_NEXT.get(belt_val) if profile_val == 'adulto' else _INFANTIL_NEXT.get(belt_val)
+    student_age = _calc_age(student.birth_date)
+    min_age = _get_min_age_for_promotion(student)
+
     return AlunoDashboard(
         student=StudentOut.model_validate(student),
         attendance=attendance,
@@ -92,4 +119,10 @@ def get_dashboard(
         pix_key=pix_key,
         pix_qrcode_base64=pix_qrcode_base64,
         pix_copia_cola=pix_copia_cola,
+        belt_progress_count=att_since_count,
+        belt_progress_target=belt_target,
+        belt_progress_since=since_date.isoformat(),
+        belt_next=belt_next,
+        student_age=student_age,
+        min_age_for_promotion=min_age,
     )
