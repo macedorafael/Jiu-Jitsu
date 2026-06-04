@@ -310,7 +310,7 @@ def list_sessions(
 ):
     from app.models import UserRole
     q = db.query(TrainingSession)
-    if current_user.role != UserRole.root:
+    if current_user.school_id is not None:
         q = q.filter(TrainingSession.school_id == current_user.school_id)
     if student_name.strip():
         # Filtra apenas sessões onde o aluno com esse nome tem presença
@@ -348,7 +348,7 @@ def student_attendance_summary(
         .filter(Student.active == True)
     )
 
-    if current_user.role != UserRole.root:
+    if current_user.school_id is not None:
         q = q.filter(TrainingSession.school_id == current_user.school_id)
 
     # Professor ou admin_especifico com perfil restrito — filtra por perfil

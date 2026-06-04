@@ -96,9 +96,9 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 
 def _school_filter(query, current_user: User):
-    """Filtra alunos pela escola do usuário. Root vê todos.
-    admin_especifico e professor com profile_access filtram por perfil."""
-    if current_user.role != UserRole.root:
+    """Filtra alunos pela escola do usuário.
+    Root sem override vê todos; com override filtra pela escola selecionada."""
+    if current_user.school_id is not None:
         query = query.filter(Student.school_id == current_user.school_id)
     if current_user.profile_access and current_user.role in (UserRole.admin_especifico, UserRole.professor):
         query = query.filter(Student.profile == current_user.profile_access)
@@ -107,8 +107,8 @@ def _school_filter(query, current_user: User):
 
 def _check_school_access(student: Student, current_user: User):
     """Levanta 403 se o usuário não pertence à mesma escola do aluno."""
-    if current_user.role == UserRole.root:
-        return
+    if current_user.school_id is None:
+        return  # root sem override: acesso total
     if student.school_id != current_user.school_id:
         raise HTTPException(403, "Acesso não autorizado")
 
@@ -120,8 +120,8 @@ def get_belt_progress(
     current_user: User = Depends(require_professor_up),
 ):
     """Retorna progresso de presenças de cada aluno ativo em relação à próxima graduação."""
-    if current_user.role == UserRole.root:
-        raise HTTPException(400, "Root não pertence a uma escola específica")
+    if current_user.school_id is None:
+        raise HTTPException(400, "Selecione uma escola para ver o progresso de faixas")
 
     school = db.get(School, current_user.school_id)
     if not school:

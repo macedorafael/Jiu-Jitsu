@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/financeiro", tags=["financeiro"])
 def _student_ids(db: Session, current_user: User, profile: Optional[str] = None) -> list[int]:
     """IDs dos alunos visíveis para o usuário (escola ou todos para root), com filtro de perfil."""
     q = db.query(Student.id).filter(Student.active == True)
-    if current_user.role != UserRole.root:
+    if current_user.school_id is not None:
         q = q.filter(Student.school_id == current_user.school_id)
     # admin_especifico: sempre restrito ao seu perfil de acesso
     effective_profile = profile

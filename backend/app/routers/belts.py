@@ -16,8 +16,8 @@ ALLOWED_CERT_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 
 
 def _check_school_access(student: Student, current_user: User):
-    if current_user.role == UserRole.root:
-        return
+    if current_user.school_id is None:
+        return  # root sem override: acesso total
     if student.school_id != current_user.school_id:
         raise HTTPException(403, "Acesso não autorizado")
 

@@ -26,7 +26,7 @@ def list_schedules(
 ):
     """Lista os horários ativos da escola do usuário logado."""
     q = db.query(ClassSchedule).filter(ClassSchedule.active == True)
-    if current_user.role != UserRole.root:
+    if current_user.school_id is not None:
         q = q.filter(ClassSchedule.school_id == current_user.school_id)
     return q.order_by(ClassSchedule.day_of_week, ClassSchedule.start_time).all()
 

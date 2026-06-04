@@ -31,7 +31,7 @@ def get_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
-    school_id = current_user.school_id if current_user.role != UserRole.root else None
+    school_id = current_user.school_id  # None = root sem override (vê tudo)
     today = date.today()
 
     # ── Base queries ──────────────────────────────────────────────────────────

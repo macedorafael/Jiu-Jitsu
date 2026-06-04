@@ -25,8 +25,8 @@ def list_users(
 ):
     q = db.query(User)
 
-    # Root vê todos; demais veem apenas da própria escola
-    if current_user.role != UserRole.root:
+    # Root sem override vê todos; com override filtra pela escola selecionada
+    if current_user.school_id is not None:
         q = q.filter(User.school_id == current_user.school_id)
 
     # Professor vê apenas alunos (e ele mesmo)
