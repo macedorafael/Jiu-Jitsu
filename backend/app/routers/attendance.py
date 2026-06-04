@@ -10,7 +10,7 @@ from app.models import Student, TrainingSession, Attendance, UnidentifiedFace, U
 from app.schemas import (
     SessionResult, AttendanceOut, UnidentifiedFaceOut, SessionOut,
     IdentifyFaceRequest, ChangeAttendanceRequest, RemoveAttendanceRequest,
-    ManualSessionCreate, ManualAttendanceAdd,
+    ManualSessionCreate, ManualAttendanceAdd, SessionUpdate,
     DetectResult, TempRecognizedOut, TempUnidentifiedOut,
     ConfirmAttendanceItem, ConfirmSessionCreate,
     StudentAttendanceSummaryOut,
@@ -407,6 +407,42 @@ def create_manual_session(
         flexible_time=resolved_flexible,
     )
     db.add(session)
+    db.commit()
+    db.refresh(session)
+    return _session_to_out(session)
+
+
+@router.put("/{session_id}", response_model=SessionOut)
+def update_session(
+    session_id: int,
+    data: SessionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_professor_up),
+):
+    """Edita data, horário e observações de uma sessão existente."""
+    session = db.get(TrainingSession, session_id)
+    if not session:
+        raise HTTPException(404, "Sessão não encontrada")
+
+    if data.session_date:
+        try:
+            session.date = date.fromisoformat(data.session_date)
+        except ValueError:
+            raise HTTPException(400, "Data inválida")
+
+    if data.notes is not None:
+        session.notes = data.notes or None
+
+    schedule_id = data.schedule_id if data.schedule_id and data.schedule_id > 0 else None
+    flexible = data.flexible_time.strip() if data.flexible_time else None
+
+    if schedule_id is not None:
+        session.schedule_id = schedule_id
+        session.flexible_time = None
+    elif flexible is not None:
+        session.flexible_time = flexible
+        session.schedule_id = None
+
     db.commit()
     db.refresh(session)
     return _session_to_out(session)

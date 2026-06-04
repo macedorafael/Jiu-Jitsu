@@ -1,14 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+
+const STORAGE_KEY = 'academia_remember'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Carrega credenciais salvas ao abrir a tela
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const { email: e, password: p } = JSON.parse(saved)
+        setEmail(e ?? '')
+        setPassword(p ?? '')
+        setRemember(true)
+      } catch {}
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -16,6 +32,11 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
+      if (remember) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ email, password }))
+      } else {
+        localStorage.removeItem(STORAGE_KEY)
+      }
       navigate('/')
     } catch {
       setError('Email ou senha incorretos')
@@ -90,6 +111,17 @@ export default function Login() {
                   required
                 />
               </div>
+
+              {/* Lembrar login */}
+              <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="w-4 h-4 rounded accent-red-600 cursor-pointer"
+                />
+                <span className="text-sm text-gray-500">Lembrar email e senha</span>
+              </label>
 
               {error && (
                 <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">

@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Users, Camera, DollarSign, LayoutDashboard, LogOut,
   Building2, UserCog, Settings, User, Clock, ClipboardList,
-  TrendingUp, X, KeyRound, Eye, EyeOff, HelpCircle,
+  TrendingUp, X, KeyRound, Eye, EyeOff, HelpCircle, Globe,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { Role, authApi } from '../../api/client'
+import { Role, authApi, schoolsApi } from '../../api/client'
 
 // ── Modal de troca de senha ───────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
@@ -120,6 +120,60 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ── Seletor de escola para root ───────────────────────────────────────────────
+function SchoolSelector() {
+  const { viewAsSchool, setViewAsSchool } = useAuth()
+  const [schools, setSchools] = useState<{ id: number; name: string }[]>([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    schoolsApi.list().then(({ data }) => setSchools(data)).catch(() => {})
+  }, [])
+
+  return (
+    <div className="mx-3 mb-2">
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1 mb-1 flex items-center gap-1">
+        <Globe size={10} /> Visualizando escola
+      </p>
+      <div className="relative">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm transition-all"
+          style={{ backgroundColor: viewAsSchool ? 'rgba(204,0,0,0.15)' : 'rgba(255,255,255,0.05)', color: viewAsSchool ? '#ff6666' : '#9ca3af' }}
+        >
+          <span className="truncate font-medium">
+            {viewAsSchool ? viewAsSchool.name : 'Todas as escolas'}
+          </span>
+          <span className="text-xs flex-shrink-0">▾</span>
+        </button>
+
+        {open && (
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-xl shadow-xl z-50 overflow-hidden"
+            style={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <button
+              className="w-full text-left text-sm px-3 py-2.5 hover:bg-white/5 transition-colors"
+              style={{ color: !viewAsSchool ? '#ffffff' : '#9ca3af' }}
+              onClick={() => { setViewAsSchool(null); setOpen(false) }}
+            >
+              🌐 Todas as escolas
+            </button>
+            {schools.map((s) => (
+              <button
+                key={s.id}
+                className="w-full text-left text-sm px-3 py-2.5 hover:bg-white/5 transition-colors border-t"
+                style={{ color: viewAsSchool?.id === s.id ? '#ff6666' : '#9ca3af', borderColor: 'rgba(255,255,255,0.05)' }}
+                onClick={() => { setViewAsSchool(s); setOpen(false) }}
+              >
+                🏫 {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const nav: { to: string; icon: any; label: string; roles: Role[] }[] = [
   { to: '/',           icon: LayoutDashboard, label: 'Dashboard',     roles: ['root', 'admin', 'admin_especifico', 'professor'] },
   { to: '/meu-perfil', icon: User,            label: 'Meu Perfil',    roles: ['aluno'] },
@@ -149,7 +203,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, viewAsSchool } = useAuth()
   const [showChangePwd, setShowChangePwd] = useState(false)
 
   return (
@@ -186,6 +240,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </h1>
             <p className="text-sm text-gray-300 font-medium truncate mt-1">{user?.name}</p>
             <p className="text-xs text-gray-500 mt-0.5">{user ? ROLE_LABELS[user.role as Role] : ''}</p>
+            {user?.role === 'root' && viewAsSchool && (
+              <p className="text-xs mt-1 font-semibold truncate" style={{ color: '#ff6666' }}>
+                👁 {viewAsSchool.name}
+              </p>
+            )}
           </div>
 
           {/* Fechar mobile */}
@@ -196,6 +255,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <X size={18} />
           </button>
         </div>
+
+        {/* ── Seletor de escola (só root) ────────── */}
+        {user?.role === 'root' && (
+          <div className="pt-3 pb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <SchoolSelector />
+          </div>
+        )}
 
         {/* ── Navegação ──────────────────────────── */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

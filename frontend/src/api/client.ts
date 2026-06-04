@@ -5,6 +5,16 @@ const api = axios.create({ baseURL: '/api' })
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+
+  // Root visualizando como escola específica
+  const viewAsSchool = localStorage.getItem('view_as_school')
+  if (viewAsSchool) {
+    try {
+      const { id } = JSON.parse(viewAsSchool)
+      if (id) config.headers['X-School-Override'] = String(id)
+    } catch {}
+  }
+
   return config
 })
 
@@ -274,6 +284,9 @@ export const attendanceApi = {
   createManualSession: (data: {
     session_date?: string; notes?: string; schedule_id?: number; flexible_time?: string
   }) => api.post<Session>('/sessions/manual', data),
+  updateSession: (sessionId: number, data: {
+    session_date?: string; notes?: string; schedule_id?: number; flexible_time?: string
+  }) => api.put<Session>(`/sessions/${sessionId}`, data),
   detectFaces: (
     file: File, notes?: string, date?: string, scheduleId?: number, flexibleTime?: string,
   ) => {

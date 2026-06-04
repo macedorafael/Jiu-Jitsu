@@ -162,21 +162,126 @@ function ManualSessionModal({ schedules, onClose, onCreated }: ManualModalProps)
   )
 }
 
+// ── EditSessionModal ──────────────────────────────────────────────────────────
+interface EditModalProps {
+  session: Session
+  schedules: ClassSchedule[]
+  onClose: () => void
+  onUpdated: (s: Session) => void
+}
+
+function EditSessionModal({ session, schedules, onClose, onUpdated }: EditModalProps) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [sessionDate, setSessionDate] = useState(session.date)
+  const [notes, setNotes] = useState(session.notes ?? '')
+  const [scheduleId, setScheduleId] = useState(0)
+  const [useFlexible, setUseFlexible] = useState(!!session.flexible_time)
+  const [flexibleTime, setFlexibleTime] = useState(session.flexible_time ?? '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const grouped = DAYS.map((day, idx) => ({
+    day, idx,
+    items: schedules.filter((s) => s.day_of_week === idx),
+  })).filter((g) => g.items.length > 0)
+
+  async function handleSave() {
+    setSaving(true)
+    setErr('')
+    try {
+      const sid = useFlexible ? undefined : (scheduleId > 0 ? scheduleId : undefined)
+      const flex = useFlexible ? flexibleTime.trim() || undefined : undefined
+      const { data } = await attendanceApi.updateSession(session.id, {
+        session_date: sessionDate,
+        notes: notes || undefined,
+        schedule_id: sid,
+        flexible_time: flex,
+      })
+      onUpdated(data)
+    } catch (e: any) {
+      setErr(e.response?.data?.detail ?? 'Erro ao salvar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Pencil size={18} /> Editar Sessão
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Data da aula *</label>
+          <input type="date" className="input" value={sessionDate}
+            max={today} onChange={(e) => setSessionDate(e.target.value)} />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium flex items-center gap-1"><Clock size={13} /> Horário</label>
+            <button type="button" className="text-xs text-primary-600 hover:underline"
+              onClick={() => { setUseFlexible(!useFlexible); setScheduleId(0); setFlexibleTime('') }}>
+              {useFlexible ? 'Usar horário cadastrado' : 'Horário flexível'}
+            </button>
+          </div>
+          {useFlexible ? (
+            <input type="text" className="input" placeholder="Ex: Aula particular 15:00"
+              value={flexibleTime} onChange={(e) => setFlexibleTime(e.target.value)} />
+          ) : (
+            <select className="input" value={scheduleId} onChange={(e) => setScheduleId(Number(e.target.value))}>
+              <option value={0}>— Sem horário fixo —</option>
+              {grouped.map(({ day, items }) =>
+                items.map((s) => (
+                  <option key={s.id} value={s.id}>{day} · {s.start_time}–{s.end_time}</option>
+                ))
+              )}
+            </select>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Observações</label>
+          <textarea className="input resize-none" rows={2} value={notes}
+            onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" />
+        </div>
+
+        {err && <p className="text-red-600 text-sm">{err}</p>}
+
+        <div className="flex gap-2 pt-1">
+          <button className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary flex-1" onClick={handleSave} disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── SessionRow ────────────────────────────────────────────────────────────────
 interface SessionRowProps {
   session: Session
   students: Student[]
+  schedules: ClassSchedule[]
   canEdit: boolean
   onDeleted: (id: number) => void
+  onUpdated: (s: Session) => void
 }
 
-function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) {
+function SessionRow({ session: initialSession, students, schedules, canEdit, onDeleted, onUpdated }: SessionRowProps) {
+  const [session, setSession] = useState(initialSession)
   const [open, setOpen] = useState(false)
   const [attendees, setAttendees] = useState<AttendanceResult[] | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [addingStudent, setAddingStudent] = useState(false)
   const [savingAdd, setSavingAdd] = useState(false)
   const [addSearch, setAddSearch] = useState('')
+  const [showEdit, setShowEdit] = useState(false)
 
   async function loadDetail() {
     if (attendees !== null) { setOpen(true); return }
@@ -263,7 +368,30 @@ function SessionRow({ session, students, canEdit, onDeleted }: SessionRowProps) 
         <span className="ml-auto flex-shrink-0 bg-primary-100 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full">
           {session.attendance_count} aluno{session.attendance_count !== 1 ? 's' : ''}
         </span>
+
+        {canEdit && (
+          <button
+            className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            title="Editar sessão"
+            onClick={(e) => { e.stopPropagation(); setShowEdit(true) }}
+          >
+            <Pencil size={14} />
+          </button>
+        )}
       </button>
+
+      {showEdit && (
+        <EditSessionModal
+          session={session}
+          schedules={schedules}
+          onClose={() => setShowEdit(false)}
+          onUpdated={(updated) => {
+            setSession(updated)
+            onUpdated(updated)
+            setShowEdit(false)
+          }}
+        />
+      )}
 
       {open && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50">
@@ -695,7 +823,7 @@ function StudentSummaryView({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SessionsPage() {
   const { user } = useAuth()
-  const canEdit = user?.role === 'root' || user?.role === 'admin' || user?.role === 'professor'
+  const canEdit = user?.role === 'root' || user?.role === 'admin' || user?.role === 'admin_especifico'
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -802,6 +930,10 @@ export default function SessionsPage() {
 
   function handleDeleted(id: number) {
     setSessions((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  function handleUpdated(updated: Session) {
+    setSessions((prev) => prev.map((s) => s.id === updated.id ? updated : s))
   }
 
   return (
@@ -952,8 +1084,10 @@ export default function SessionsPage() {
                     key={s.id}
                     session={s}
                     students={students}
+                    schedules={schedules}
                     canEdit={canEdit}
                     onDeleted={handleDeleted}
+                    onUpdated={handleUpdated}
                   />
                 ))}
               </div>

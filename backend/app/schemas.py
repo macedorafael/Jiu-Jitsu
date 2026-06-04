@@ -304,6 +304,13 @@ class ManualSessionCreate(BaseModel):
     flexible_time: Optional[str] = None
 
 
+class SessionUpdate(BaseModel):
+    session_date: Optional[str] = None
+    notes: Optional[str] = None
+    schedule_id: Optional[int] = None
+    flexible_time: Optional[str] = None
+
+
 class ManualAttendanceAdd(BaseModel):
     student_id: int
 
