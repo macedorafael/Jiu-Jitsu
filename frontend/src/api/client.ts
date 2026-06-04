@@ -163,7 +163,8 @@ export interface FeePlan {
 
 export interface Payment {
   id: number; fee_plan_id: number; student_id: number
-  month_reference: string; amount_paid?: number; payment_date?: string; status: FeeStatus
+  month_reference: string; amount_paid?: number; plan_amount?: number
+  payment_date?: string; status: FeeStatus
 }
 
 export interface AlunoDashboard {

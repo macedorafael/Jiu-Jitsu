@@ -334,8 +334,13 @@ export default function FeesPage() {
                             <Icon size={14} />
                             {p.month_reference}
                           </span>
-                          <span>
-                            {p.amount_paid ? `R$ ${p.amount_paid.toFixed(2)}` : '—'}
+                          <span className="text-right">
+                            {p.amount_paid
+                              ? `R$ ${p.amount_paid.toFixed(2)}`
+                              : p.plan_amount
+                                ? <span className="opacity-60">R$ {p.plan_amount.toFixed(2)}</span>
+                                : '—'
+                            }
                             {p.payment_date && <span className="text-xs ml-2 opacity-70">{p.payment_date}</span>}
                           </span>
                         </li>

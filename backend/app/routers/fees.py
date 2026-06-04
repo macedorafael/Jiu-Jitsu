@@ -77,7 +77,7 @@ def list_payments(
         q = q.filter(FeePayment.month_reference == month)
     if status:
         q = q.filter(FeePayment.status == status)
-    return q.order_by(FeePayment.month_reference.desc()).all()
+    return [PaymentOut.from_payment(p) for p in q.order_by(FeePayment.month_reference.desc()).all()]
 
 
 @router.get("/students/{student_id}/payments", response_model=list[PaymentOut])
@@ -86,12 +86,13 @@ def student_payments(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_up),
 ):
-    return (
+    payments = (
         db.query(FeePayment)
         .filter(FeePayment.student_id == student_id)
         .order_by(FeePayment.month_reference.desc())
         .all()
     )
+    return [PaymentOut.from_payment(p) for p in payments]
 
 
 @router.post("/payments", response_model=PaymentOut)

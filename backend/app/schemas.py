@@ -397,10 +397,24 @@ class PaymentOut(BaseModel):
     student_id: int
     month_reference: str
     amount_paid: Optional[float]
+    plan_amount: Optional[float] = None
     payment_date: Optional[date]
     status: FeeStatus
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_payment(cls, p) -> "PaymentOut":
+        return cls(
+            id=p.id,
+            fee_plan_id=p.fee_plan_id,
+            student_id=p.student_id,
+            month_reference=p.month_reference,
+            amount_paid=p.amount_paid,
+            plan_amount=p.fee_plan.amount if p.fee_plan else None,
+            payment_date=p.payment_date,
+            status=p.status,
+        )
 
 
 # ── Aluno Dashboard ───────────────────────────────────────────────────────────
