@@ -24,6 +24,13 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 
 def check_overdue_fees():
+    # Evita execução duplicada em ambiente multi-worker
+    # usando uma flag de lock simples por processo
+    import os
+    worker_id = os.getenv("APP_WORKER_ID", "")
+    if worker_id and worker_id != "0":
+        return  # Só o worker 0 executa o agendador
+
     db: Session = SessionLocal()
     try:
         today = date.today()
@@ -47,6 +54,11 @@ def check_overdue_fees():
                     status=status,
                 )
                 db.add(payment)
+                try:
+                    db.flush()  # Detecta duplicata imediatamente
+                except Exception:
+                    db.rollback()
+                    continue
             elif payment.status == FeeStatus.pending and today.day > plan.due_day:
                 payment.status = FeeStatus.overdue
             if payment.status == FeeStatus.overdue:
