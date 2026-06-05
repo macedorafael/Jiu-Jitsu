@@ -340,7 +340,8 @@ class DetectResult(BaseModel):
 class ConfirmAttendanceItem(BaseModel):
     student_id: int
     confidence_score: Optional[float] = None
-    face_image_path: Optional[str] = None   # recorte a salvar como foto de perfil
+    face_image_path: Optional[str] = None
+    update_encoding: bool = False   # atualizar encoding com este recorte
 
 
 class ConfirmSessionCreate(BaseModel):

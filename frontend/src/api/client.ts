@@ -114,6 +114,7 @@ export interface TempRecognized {
   student_id: number; student_name: string
   confidence_score?: number; photo_path?: string
   face_image_path?: string   // recorte salvo em disco
+  update_encoding?: boolean  // atualizar encoding com este recorte
 }
 
 export interface TempUnidentified {
@@ -132,6 +133,7 @@ export interface ConfirmAttendanceItem {
   student_id: number
   confidence_score?: number
   face_image_path?: string
+  update_encoding?: boolean
 }
 
 export interface StudentAttendanceSummary {

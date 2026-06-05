@@ -174,19 +174,19 @@ def confirm_session(
         )
         db.add(att)
 
-        # Sempre atualiza a foto do aluno com o recorte mais recente da chamada
-        if item.face_image_path:
+        # Atualiza encoding apenas quando o usuário solicitou explicitamente
+        if item.update_encoding and item.face_image_path:
             student = db.get(Student, item.student_id)
             if student and os.path.exists(item.face_image_path):
-                student.photo_path = item.face_image_path
                 try:
                     with open(item.face_image_path, "rb") as fh:
                         crop_bytes = fh.read()
                     encoding = encode_face_from_crop_bytes(crop_bytes)
                     if encoding:
                         student.face_encoding = json.dumps(encoding)
-                except Exception:
-                    pass
+                        logger.info("Encoding atualizado para aluno %s (id=%d)", student.name, student.id)
+                except Exception as e:
+                    logger.warning("Falha ao atualizar encoding do aluno %d: %s", item.student_id, e)
 
     db.commit()
     return {"ok": True, "session_id": session.id, "attendance_count": len(seen_ids)}

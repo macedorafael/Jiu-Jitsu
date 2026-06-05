@@ -96,7 +96,10 @@ function RecognizedCard({
   onRemove: (entry: TempRecognized) => void
 }) {
   const [mode, setMode] = useState<'view' | 'change'>('view')
-  const imgUrl = faceImageUrl(entry.photo_path) ?? faceImageUrl(entry.face_image_path)
+  // Prioriza o recorte da foto tirada na chamada; fallback para foto do perfil
+  const imgUrl = faceImageUrl(entry.face_image_path) ?? faceImageUrl(entry.photo_path)
+  // Checkbox de encoding aparece apenas em identificações manuais (sem confidence_score)
+  const isManual = entry.confidence_score == null
 
   function handleChange(toId: number) {
     const s = students.find((x) => x.id === toId)
@@ -107,6 +110,7 @@ function RecognizedCard({
       student_name: s.name,
       confidence_score: undefined,
       photo_path: s.photo_path,
+      update_encoding: true, // padrão: atualizar encoding na correção manual
     })
     setMode('view')
   }
@@ -131,6 +135,22 @@ function RecognizedCard({
             {entry.confidence_score != null && (
               <p className="text-[11px] text-gray-400">{Math.round(entry.confidence_score * 100)}% confiança</p>
             )}
+
+            {/* Checkbox de encoding — só para identificações manuais */}
+            {isManual && entry.face_image_path && (
+              <label className="flex items-center gap-1.5 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  checked={entry.update_encoding ?? true}
+                  onChange={(e) => onChange(entry, { ...entry, update_encoding: e.target.checked })}
+                  className="w-3 h-3 accent-primary-600"
+                />
+                <span className="text-[10px] text-gray-500 leading-tight">
+                  Melhorar reconhecimento
+                </span>
+              </label>
+            )}
+
             <div className="flex gap-1 mt-auto pt-1">
               <button
                 className="flex-1 text-[11px] text-primary-600 hover:underline flex items-center gap-1 justify-center"
@@ -316,6 +336,7 @@ export default function AttendancePage() {
                 confidence_score: undefined,
                 photo_path: s.photo_path,
                 face_image_path: entry.face_image_path,
+                update_encoding: true, // padrão: atualizar encoding ao identificar
               },
             }
           : f,
@@ -335,11 +356,15 @@ export default function AttendancePage() {
     try {
       const attendance: ConfirmAttendanceItem[] = faces
         .filter((f) => f.kind === 'recognized')
-        .map((f) => ({
-          student_id: (f.data as TempRecognized).student_id,
-          confidence_score: (f.data as TempRecognized).confidence_score,
-          face_image_path: (f.data as TempRecognized).face_image_path,
-        }))
+        .map((f) => {
+          const r = f.data as TempRecognized
+          return {
+            student_id: r.student_id,
+            confidence_score: r.confidence_score,
+            face_image_path: r.face_image_path,
+            update_encoding: r.update_encoding ?? false,
+          }
+        })
 
       const { data } = await attendanceApi.confirmSession(tempId, attendance)
       setSuccessInfo({ count: data.attendance_count })
