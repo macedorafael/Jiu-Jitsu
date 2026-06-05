@@ -125,6 +125,23 @@ const SECTIONS: HelpSection[] = [
         ],
       },
       {
+        title: 'Checkbox "Melhorar reconhecimento"', roles: ['admin', 'admin_especifico', 'professor'],
+        description: 'Aparece quando você corrige uma identificação errada ou identifica um rosto desconhecido. Quando marcado, o sistema aprende com aquele rosto e melhora o reconhecimento futuro daquele aluno.',
+        steps: [
+          { text: 'O checkbox aparece apenas em dois momentos: quando você corrige quem o sistema identificou errado, ou quando você identifica manualmente um rosto que o sistema não reconheceu' },
+          { text: 'Por padrão vem MARCADO — basta confirmar normalmente e o sistema aprende sozinho' },
+          { text: 'Se quiser desmarcar, clique no checkbox antes de confirmar a chamada' },
+        ],
+        tips: [
+          '✅ MARQUE quando: o rosto está bem iluminado, de frente e nítido — o sistema vai reconhecer melhor nas próximas chamadas',
+          '✅ MARQUE quando: o aluno mudou o visual (cortou o cabelo, cresceu barba) e está sendo reconhecido com dificuldade',
+          '❌ DESMARQUE quando: a foto está escura, desfocada ou o rosto está de lado — um encoding ruim piora o reconhecimento futuro',
+          '❌ DESMARQUE quando: o aluno está usando chapéu, óculos escuros ou algo que cubra parte do rosto',
+          '❌ DESMARQUE quando: você identificou o aluno mas não tem certeza se o rosto recortado é realmente aquela pessoa',
+          'Dica: na dúvida, deixe marcado. Fotos tiradas no treino com boa iluminação tendem a ser melhores que a foto de perfil cadastrada',
+        ],
+      },
+      {
         title: 'Criar chamada manual (sem foto)', roles: ['admin', 'admin_especifico', 'professor'],
         description: 'Cria uma sessão de treino e adiciona alunos manualmente, sem usar reconhecimento facial.',
         steps: [
