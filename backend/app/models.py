@@ -64,7 +64,7 @@ class School(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     pix_key: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Requisitos mínimos de presença por categoria de faixa
     min_attendance_infantil: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     min_attendance_blue: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -88,7 +88,7 @@ class User(Base):
     school_id: Mapped[Optional[int]] = mapped_column(ForeignKey("schools.id"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     school: Mapped[Optional["School"]] = relationship("School", back_populates="users")
     student: Mapped[Optional["Student"]] = relationship("Student", back_populates="user", uselist=False)
@@ -113,7 +113,7 @@ class Student(Base):
     photo_path: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     face_encoding: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     user: Mapped[Optional[User]] = relationship("User", back_populates="student")
     school: Mapped[Optional[School]] = relationship("School", back_populates="students")
@@ -138,7 +138,7 @@ class ClassSchedule(Base):
     start_time: Mapped[str] = mapped_column(String(5))   # "HH:MM"
     end_time: Mapped[str] = mapped_column(String(5))     # "HH:MM"
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     school: Mapped[Optional["School"]] = relationship("School")
 
@@ -154,7 +154,7 @@ class TrainingSession(Base):
     date: Mapped[date] = mapped_column(Date, default=date.today)
     training_photo_path: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     professor: Mapped[User] = relationship("User", back_populates="sessions")
     schedule: Mapped[Optional["ClassSchedule"]] = relationship("ClassSchedule")
@@ -169,7 +169,7 @@ class Attendance(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("training_sessions.id"))
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     session: Mapped[TrainingSession] = relationship("TrainingSession", back_populates="attendance")
     student: Mapped[Student] = relationship("Student", back_populates="attendance")
@@ -182,7 +182,7 @@ class UnidentifiedFace(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("training_sessions.id"))
     face_image_path: Mapped[str] = mapped_column(String(300))
     identified_as_student_id: Mapped[Optional[int]] = mapped_column(ForeignKey("students.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     session: Mapped[TrainingSession] = relationship("TrainingSession", back_populates="unidentified_faces")
     identified_as: Mapped[Optional[Student]] = relationship(
@@ -200,7 +200,7 @@ class StudentStatusHistory(Base):
     changed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     new_status: Mapped[str] = mapped_column(String(20))   # "ativo" | "pausado"
     observation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     student: Mapped["Student"] = relationship("Student", back_populates="status_history")
     changed_by: Mapped["User"] = relationship("User")
@@ -232,7 +232,7 @@ class FeePlan(Base):
     due_day: Mapped[int] = mapped_column(Integer)
     payment_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     student: Mapped[Student] = relationship("Student", back_populates="fee_plans")
     payments: Mapped[list["FeePayment"]] = relationship("FeePayment", back_populates="fee_plan")
