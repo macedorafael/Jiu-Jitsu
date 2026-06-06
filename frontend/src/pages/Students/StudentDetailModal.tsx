@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { format, parseISO, differenceInYears } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { todayBR } from '../../utils/dateUtils'
 import {
   studentsApi, beltsApi, feesApi,
   Student, BeltHistory, FeePlan, Payment, Belt, StudentStatusHistoryEntry, BeltProgressEntry,
@@ -100,7 +101,7 @@ function PromoteBeltModal({
 }: { student: Student; onClose: () => void; onSaved: (belt: Belt, degree: number, entry: BeltHistory) => void }) {
   const [belt, setBelt] = useState<Belt>(student.belt)
   const [degree, setDegree] = useState(student.degree)
-  const [awardedDate, setAwardedDate] = useState(new Date().toISOString().slice(0, 10))
+  const [awardedDate, setAwardedDate] = useState(todayBR())
   const [notes, setNotes] = useState('')
   const [certFile, setCertFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)

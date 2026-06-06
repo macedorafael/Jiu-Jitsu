@@ -461,7 +461,7 @@ function SectionCard({ section }: { section: HelpSection }) {
           <h2 className="text-white font-bold text-base leading-tight">{section.title}</h2>
           <p className="text-white/70 text-xs">{section.subtitle}</p>
         </div>
-        <span className="ml-auto text-white/60 text-xs font-medium">{section.items.length} função{section.items.length !== 1 ? 'ões' : ''}</span>
+        <span className="ml-auto text-white/60 text-xs font-medium">{section.items.length} {section.items.length !== 1 ? 'funções' : 'função'}</span>
       </div>
 
       {/* Items */}
@@ -555,7 +555,7 @@ export default function HelpPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Central de Ajuda</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {totalFunctions} função{totalFunctions !== 1 ? 'ões' : ''} disponível{totalFunctions !== 1 ? 'eis' : ''} para o seu perfil
+            {totalFunctions} {totalFunctions !== 1 ? 'funções' : 'função'} disponível{totalFunctions !== 1 ? 'eis' : ''} para o seu perfil
             <span className="ml-1 font-medium text-primary-600">
               ({user?.name})
             </span>
@@ -568,7 +568,7 @@ export default function HelpPage() {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar função ou funcionalidade..."
+          placeholder="Buscar funcionalidade..."
           className="input pl-9 py-2.5"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -579,7 +579,7 @@ export default function HelpPage() {
       {visibleSections.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
           <AlertTriangle size={32} className="mx-auto mb-2 opacity-30" />
-          <p>Nenhuma função encontrada para "{search}"</p>
+          <p>Nenhum resultado encontrado para "{search}"</p>
         </div>
       ) : (
         visibleSections.map((section) => (

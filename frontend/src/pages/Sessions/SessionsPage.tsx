@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { todayBR } from '../../utils/dateUtils'
 import {
   ClipboardList, ChevronDown, ChevronRight, Plus, UserPlus,
   Camera, Pencil, Calendar, Clock, User, X, Search,
@@ -50,7 +51,8 @@ function sessionLabel(s: Session): string {
 
 /** Retorna data ISO de N meses atrás a partir de hoje */
 function monthsAgo(n: number): string {
-  const d = new Date()
+  const today = todayBR()
+  const d = new Date(today)
   d.setMonth(d.getMonth() - n)
   return d.toISOString().slice(0, 10)
 }
@@ -70,7 +72,7 @@ interface ManualModalProps {
 }
 
 function ManualSessionModal({ schedules, onClose, onCreated }: ManualModalProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayBR()
   const [sessionDate, setSessionDate] = useState(today)
   const [notes, setNotes] = useState('')
   const [scheduleId, setScheduleId] = useState(0)
@@ -171,7 +173,7 @@ interface EditModalProps {
 }
 
 function EditSessionModal({ session, schedules, onClose, onUpdated }: EditModalProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayBR()
   const [sessionDate, setSessionDate] = useState(session.date)
   const [notes, setNotes] = useState(session.notes ?? '')
   const [scheduleId, setScheduleId] = useState(0)
@@ -862,7 +864,7 @@ export default function SessionsPage() {
   // Aplica período rápido
   function applyPeriod(months: number) {
     const from = monthsAgo(months)
-    const to = new Date().toISOString().slice(0, 10)
+    const to = todayBR()
     setFilterFrom(from)
     setFilterTo(to)
     setActivePeriod(months)

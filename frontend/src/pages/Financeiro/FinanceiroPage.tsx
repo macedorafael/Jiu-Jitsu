@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { financeiroApi, FinancialSummary, FinancialPayment, StudentProfile } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import { currentMonthBR } from '../../utils/dateUtils'
 
 // ── formatadores ──────────────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ export default function FinanceiroPage() {
   const [loadingS, setLoadingS] = useState(true)
   const [loadingP, setLoadingP] = useState(true)
 
-  const [filterMonth,   setFilterMonth]   = useState(() => new Date().toISOString().slice(0, 7))
+  const [filterMonth,   setFilterMonth]   = useState(() => currentMonthBR())
   const [filterStatus,  setFilterStatus]  = useState('')
   const [filterProfile, setFilterProfile] = useState<StudentProfile | ''>( lockedProfile ?? '')
 
@@ -453,7 +454,7 @@ export default function FinanceiroPage() {
           <button
             className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
             onClick={() => {
-              setFilterMonth(new Date().toISOString().slice(0, 7))
+              setFilterMonth(currentMonthBR())
               setFilterStatus('')
               if (!isAdminEspecifico) setFilterProfile('')
             }}

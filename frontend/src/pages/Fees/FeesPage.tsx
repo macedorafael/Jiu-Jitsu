@@ -3,6 +3,7 @@ import { DollarSign, Plus, CheckCircle, Clock, AlertCircle, Search, AlertTriangl
 import { studentsApi, feesApi, financeiroApi, Student, FeePlan, Payment, FinancialPayment } from '../../api/client'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { currentMonthBR } from '../../utils/dateUtils'
 
 const STATUS_CONFIG = {
   paid:    { label: 'Pago',       icon: CheckCircle,  cls: 'text-green-600 bg-green-50' },
@@ -10,7 +11,7 @@ const STATUS_CONFIG = {
   overdue: { label: 'Em atraso',  icon: AlertCircle,  cls: 'text-red-600 bg-red-50' },
 }
 
-const CURRENT_MONTH = format(new Date(), 'yyyy-MM')
+const CURRENT_MONTH = currentMonthBR()
 
 const months = Array.from({ length: 12 }, (_, i) => {
   const d = new Date(new Date().getFullYear(), i, 1)

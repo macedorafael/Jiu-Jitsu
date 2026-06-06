@@ -8,6 +8,7 @@ import {
   attendanceApi, schedulesApi, studentsApi,
   ClassSchedule, Student, TempRecognized, TempUnidentified, ConfirmAttendanceItem,
 } from '../../api/client'
+import { todayBR } from '../../utils/dateUtils'
 
 const DAYS = [
   'Segunda-feira', 'Terça-feira', 'Quarta-feira',
@@ -243,7 +244,7 @@ export default function AttendancePage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [notes, setNotes] = useState('')
-  const [sessionDate, setSessionDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [sessionDate, setSessionDate] = useState<string>(() => todayBR())
   const [schedules, setSchedules] = useState<ClassSchedule[]>([])
   const [scheduleId, setScheduleId] = useState<number>(0)
   const [useFlexible, setUseFlexible] = useState(false)
@@ -435,7 +436,7 @@ export default function AttendancePage() {
             <input
               type="date" className="input"
               value={sessionDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={todayBR()}
               onChange={(e) => setSessionDate(e.target.value)}
               disabled={formLocked || phase === 'review'}
             />

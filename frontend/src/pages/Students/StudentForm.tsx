@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { studentsApi, feesApi, Student, Belt, StudentProfile } from '../../api/client'
 import { X, Info, DollarSign } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { todayBR } from '../../utils/dateUtils'
 
 // ── Faixas infantis (ordenadas por progressão) ─────────────────────────────
 const BELTS_INFANTIL: Belt[] = [
@@ -61,7 +62,7 @@ export default function StudentForm({
       degree: student?.degree ?? 0,
       birth_date: student?.birth_date ?? '',
       phone: student?.phone ?? '',
-      enrollment_date: student?.enrollment_date ?? new Date().toISOString().split('T')[0],
+      enrollment_date: student?.enrollment_date ?? todayBR(),
       fee_amount: '',
       fee_due_day: '10',
       fee_payment_method: 'Pix',
