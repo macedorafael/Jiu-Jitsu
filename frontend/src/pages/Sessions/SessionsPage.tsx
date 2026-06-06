@@ -418,12 +418,20 @@ function SessionRow({ session: initialSession, students, schedules, canEdit, onD
                           src={img}
                           alt={a.student_name}
                           className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
+                          onError={(e) => {
+                            const el = e.currentTarget
+                            el.style.display = 'none'
+                            const fb = el.nextElementSibling as HTMLElement
+                            if (fb) fb.style.display = 'flex'
+                          }}
                         />
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-primary-100 border-2 border-white shadow-sm flex items-center justify-center">
-                          <span className="text-primary-600 font-bold text-sm">{initials}</span>
-                        </div>
-                      )}
+                      ) : null}
+                      <div
+                        className="w-14 h-14 rounded-full bg-primary-100 border-2 border-white shadow-sm items-center justify-center"
+                        style={{ display: img ? 'none' : 'flex' }}
+                      >
+                        <span className="text-primary-600 font-bold text-sm">{initials}</span>
+                      </div>
                       {a.confidence_score != null ? (
                         <span className="absolute -bottom-0.5 -right-0.5 bg-green-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center" title="Reconhecido automaticamente">✓</span>
                       ) : (

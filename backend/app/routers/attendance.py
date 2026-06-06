@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 import uuid
 from datetime import date
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
@@ -146,6 +149,10 @@ def confirm_session(
         resolved_schedule_id = None
     resolved_flexible = (temp.get("flexible_time") or "").strip() or None
 
+    # Não salva sessão sem nenhum aluno confirmado
+    if not data.attendance:
+        raise HTTPException(400, "Nenhum aluno confirmado. Identifique pelo menos um aluno antes de salvar a chamada.")
+
     # Cria a sessão
     session = TrainingSession(
         professor_id=temp["professor_id"],
@@ -157,8 +164,7 @@ def confirm_session(
         flexible_time=resolved_flexible,
     )
     db.add(session)
-    db.commit()
-    db.refresh(session)
+    db.flush()  # gera session.id sem commitar ainda
 
     # Cria presenças
     seen_ids: set[int] = set()
@@ -188,7 +194,9 @@ def confirm_session(
                 except Exception as e:
                     logger.warning("Falha ao atualizar encoding do aluno %d: %s", item.student_id, e)
 
+    # Só commita quando tudo correu bem
     db.commit()
+    db.refresh(session)
     return {"ok": True, "session_id": session.id, "attendance_count": len(seen_ids)}
 
 
