@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { DollarSign, Plus, CheckCircle, Clock, AlertCircle, Search, AlertTriangle } from 'lucide-react'
+import { DollarSign, Plus, CheckCircle, Clock, AlertCircle, Search, AlertTriangle, XCircle } from 'lucide-react'
 import { studentsApi, feesApi, financeiroApi, Student, FeePlan, Payment, FinancialPayment } from '../../api/client'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -30,9 +30,10 @@ export default function FeesPage() {
   const [showPayForm, setShowPayForm] = useState(false)
   const [saving, setSaving]           = useState(false)
 
-  // Filtro de pendentes
-  const [filterPending, setFilterPending]         = useState(false)
+  // Filtro: 'all' | 'pending' | 'overdue'
+  const [filter, setFilter]                       = useState<'all' | 'pending' | 'overdue'>('all')
   const [pendingStudentIds, setPendingStudentIds] = useState<Set<number>>(new Set())
+  const [overdueStudentIds, setOverdueStudentIds] = useState<Set<number>>(new Set())
   const [loadingPending, setLoadingPending]       = useState(false)
 
   // Ref para scroll automático ao formulário de pagamento
@@ -41,29 +42,26 @@ export default function FeesPage() {
   // Carrega todos os alunos
   useEffect(() => { studentsApi.list().then((r) => setStudents(r.data)) }, [])
 
-  // Carrega IDs de alunos com pagamento pendente/atrasado no mês atual
-  const loadPending = useCallback(async () => {
+  // Carrega IDs de alunos pendentes e atrasados no mês atual
+  const loadFiltered = useCallback(async () => {
     setLoadingPending(true)
     try {
       const [{ data: overdue }, { data: pending }] = await Promise.all([
         financeiroApi.payments({ month: CURRENT_MONTH, status: 'overdue' }),
         financeiroApi.payments({ month: CURRENT_MONTH, status: 'pending' }),
       ])
-      const ids = new Set<number>([
-        ...overdue.map((p: FinancialPayment) => p.student_id),
-        ...pending.map((p: FinancialPayment) => p.student_id),
-      ])
-      setPendingStudentIds(ids)
+      setPendingStudentIds(new Set(pending.map((p: FinancialPayment) => p.student_id)))
+      setOverdueStudentIds(new Set(overdue.map((p: FinancialPayment) => p.student_id)))
     } finally {
       setLoadingPending(false)
     }
   }, [])
 
   useEffect(() => {
-    if (filterPending) loadPending()
-  }, [filterPending, loadPending])
+    if (filter !== 'all') loadFiltered()
+  }, [filter, loadFiltered])
 
-  async function selectStudent(s: Student, autoOpenPay = false) {
+  async function selectStudent(s: Student, autoOpenPay = false, clearFilter = false) {
     setSelected(s)
     setShowPlanForm(false)
     setShowPayForm(false)
@@ -108,14 +106,9 @@ export default function FeesPage() {
       const { data } = await feesApi.studentPayments(selected.id)
       setPayments(data)
       setShowPayForm(false)
-      // Atualiza lista de pendentes se filtro ativo
-      if (filterPending) {
-        setPendingStudentIds((prev) => {
-          const next = new Set(prev)
-          next.delete(selected.id)
-          return next
-        })
-      }
+      // Remove aluno dos sets de pendente/atrasado após pagamento
+      setPendingStudentIds((prev) => { const s = new Set(prev); s.delete(selected.id); return s })
+      setOverdueStudentIds((prev) => { const s = new Set(prev); s.delete(selected.id); return s })
     } catch (err: any) {
       alert(err.response?.data?.detail ?? 'Erro')
     } finally { setSaving(false) }
@@ -124,11 +117,13 @@ export default function FeesPage() {
   // Lista filtrada de alunos
   const displayedStudents = students.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
-    const matchPending = !filterPending || pendingStudentIds.has(s.id)
-    return matchSearch && matchPending
+    if (filter === 'pending') return matchSearch && pendingStudentIds.has(s.id)
+    if (filter === 'overdue') return matchSearch && overdueStudentIds.has(s.id)
+    return matchSearch
   })
 
   const pendingCount = pendingStudentIds.size
+  const overdueCount = overdueStudentIds.size
 
   return (
     <div>
@@ -139,12 +134,12 @@ export default function FeesPage() {
         <div className="card p-0 overflow-hidden">
           <div className="p-4 border-b bg-gray-50 space-y-3">
 
-            {/* Filtro de pendentes */}
-            <div className="flex gap-2">
+            {/* Filtro */}
+            <div className="flex gap-1.5">
               <button
-                onClick={() => setFilterPending(false)}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  !filterPending
+                onClick={() => setFilter('all')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  filter === 'all'
                     ? 'bg-primary-600 text-white'
                     : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'
                 }`}
@@ -152,22 +147,35 @@ export default function FeesPage() {
                 Todos
               </button>
               <button
-                onClick={() => setFilterPending(true)}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-                  filterPending
+                onClick={() => setFilter('pending')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                  filter === 'pending'
+                    ? 'bg-yellow-500 text-white'
+                    : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <Clock size={11} />
+                Pendentes
+                {filter === 'pending' && pendingCount > 0 && (
+                  <span className="bg-white/30 text-white text-[10px] font-bold px-1 py-0.5 rounded-full">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setFilter('overdue')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
+                  filter === 'overdue'
                     ? 'bg-red-500 text-white'
                     : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'
                 }`}
               >
-                <AlertTriangle size={13} />
-                Pendentes
-                {filterPending && pendingCount > 0 && (
-                  <span className="bg-white/30 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {pendingCount}
+                <AlertTriangle size={11} />
+                Atraso
+                {filter === 'overdue' && overdueCount > 0 && (
+                  <span className="bg-white/30 text-white text-[10px] font-bold px-1 py-0.5 rounded-full">
+                    {overdueCount}
                   </span>
-                )}
-                {!filterPending && (
-                  <span className="text-[10px] text-gray-400 font-normal">/ Atraso</span>
                 )}
               </button>
             </div>
@@ -189,11 +197,14 @@ export default function FeesPage() {
             <div className="p-6 text-center text-sm text-gray-400">Carregando...</div>
           ) : displayedStudents.length === 0 ? (
             <div className="p-6 text-center text-sm text-gray-400">
-              {filterPending ? '✓ Nenhum aluno pendente!' : 'Nenhum aluno encontrado.'}
+              {filter === 'pending' ? '✓ Nenhum aluno pendente!'
+                : filter === 'overdue' ? '✓ Nenhum aluno em atraso!'
+                : 'Nenhum aluno encontrado.'}
             </div>
           ) : (
             <ul className="divide-y max-h-[500px] overflow-y-auto">
               {displayedStudents.map((s) => {
+                const isOverdue = overdueStudentIds.has(s.id)
                 const isPending = pendingStudentIds.has(s.id)
                 return (
                   <li
@@ -201,15 +212,20 @@ export default function FeesPage() {
                     className={`px-4 py-3 cursor-pointer hover:bg-gray-50 text-sm transition-colors ${
                       selected?.id === s.id ? 'bg-primary-50' : ''
                     }`}
-                    onClick={() => selectStudent(s, filterPending)}
+                    onClick={() => selectStudent(s, filter !== 'all')}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className={`font-medium truncate ${selected?.id === s.id ? 'text-primary-700' : ''}`}>
                         {s.name}
                       </span>
-                      {isPending && (
+                      {isOverdue && (
                         <span className="flex-shrink-0">
                           <AlertCircle size={14} className="text-red-400" />
+                        </span>
+                      )}
+                      {!isOverdue && isPending && (
+                        <span className="flex-shrink-0">
+                          <Clock size={14} className="text-yellow-500" />
                         </span>
                       )}
                     </div>
@@ -355,9 +371,14 @@ export default function FeesPage() {
             <div className="card text-center py-12 text-gray-400">
               <DollarSign size={32} className="mx-auto mb-2 opacity-30" />
               <p>Selecione um aluno para gerenciar mensalidades</p>
-              {filterPending && pendingCount > 0 && (
-                <p className="text-sm text-red-400 mt-2">
+              {filter === 'pending' && pendingCount > 0 && (
+                <p className="text-sm text-yellow-500 mt-2">
                   {pendingCount} aluno{pendingCount !== 1 ? 's' : ''} com pagamento pendente
+                </p>
+              )}
+              {filter === 'overdue' && overdueCount > 0 && (
+                <p className="text-sm text-red-400 mt-2">
+                  {overdueCount} aluno{overdueCount !== 1 ? 's' : ''} em atraso
                 </p>
               )}
             </div>
