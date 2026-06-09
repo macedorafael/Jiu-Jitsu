@@ -19,6 +19,7 @@ const DAYS = [
 
 function faceImageUrl(path: string | undefined): string | undefined {
   if (!path) return undefined
+  if (path.startsWith('data:')) return path  // base64 data URL — usa direto
   const n = path.replace(/\\/g, '/')
   const idx = n.indexOf('uploads/')
   return idx === -1 ? `/uploads/${n}` : `/${n.slice(idx)}`

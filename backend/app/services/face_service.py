@@ -279,3 +279,13 @@ def save_face_crop(face_array: np.ndarray, session_ref) -> str:
     bgr = cv2.cvtColor(face_array, cv2.COLOR_RGB2BGR)
     cv2.imwrite(path, bgr)
     return path
+
+
+def face_array_to_base64(face_array: np.ndarray) -> str:
+    """Converte recorte de rosto para data URL base64 (sem salvar em disco)."""
+    import cv2
+    import base64
+    bgr = cv2.cvtColor(face_array, cv2.COLOR_RGB2BGR)
+    _, buffer = cv2.imencode('.jpg', bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    b64 = base64.b64encode(buffer).decode('utf-8')
+    return f"data:image/jpeg;base64,{b64}"

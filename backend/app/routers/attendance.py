@@ -19,7 +19,7 @@ from app.schemas import (
     StudentAttendanceSummaryOut,
 )
 from app.auth import require_professor_up, get_current_user
-from app.services.face_service import detect_and_crop_faces, get_face_encoding, match_face, save_face_crop, encode_face_from_crop_bytes
+from app.services.face_service import detect_and_crop_faces, get_face_encoding, match_face, save_face_crop, encode_face_from_crop_bytes, face_array_to_base64
 
 router = APIRouter(prefix="/api/sessions", tags=["attendance"])
 
@@ -73,7 +73,7 @@ async def detect_session(
     for face_array, _region in faces:
         encoding = get_face_encoding(face_array)
         match = match_face(encoding, students_encodings) if encoding is not None else None
-        face_path = save_face_crop(face_array, f"tmp_{temp_id}")
+        face_b64 = face_array_to_base64(face_array)  # base64 inline, sem salvar em disco
 
         if match:
             student_id, confidence = match
@@ -86,12 +86,12 @@ async def detect_session(
                 student_name=s.name if s else "?",
                 confidence_score=confidence,
                 photo_path=s.photo_path if s else None,
-                face_image_path=face_path,
+                face_image_path=face_b64,
             ))
         else:
             unidentified.append(TempUnidentifiedOut(
                 temp_face_id=str(uuid.uuid4()),
-                face_image_path=face_path,
+                face_image_path=face_b64,
             ))
 
     # Guarda metadados em memória para o /confirm
@@ -180,17 +180,44 @@ def confirm_session(
         )
         db.add(att)
 
+        # Salva foto de perfil automaticamente se aluno ainda não tiver
+        if item.face_image_path and item.face_image_path.startswith('data:image'):
+            student = db.get(Student, item.student_id)
+            if student and not student.photo_path:
+                try:
+                    import base64 as _b64
+                    crop_bytes = _b64.b64decode(item.face_image_path.split(',')[1])
+                    students_dir = os.path.join(UPLOAD_DIR, "students")
+                    os.makedirs(students_dir, exist_ok=True)
+                    filename = f"auto_{item.student_id}_{uuid.uuid4().hex[:8]}.jpg"
+                    photo_path = os.path.join(students_dir, filename)
+                    with open(photo_path, "wb") as fh:
+                        fh.write(crop_bytes)
+                    student.photo_path = photo_path
+                    logger.info("Foto de perfil criada automaticamente para aluno %s (id=%d)", student.name, student.id)
+                except Exception as e:
+                    logger.warning("Falha ao salvar foto automatica do aluno %d: %s", item.student_id, e)
+
         # Atualiza encoding apenas quando o usuário solicitou explicitamente
         if item.update_encoding and item.face_image_path:
             student = db.get(Student, item.student_id)
-            if student and os.path.exists(item.face_image_path):
+            if student:
                 try:
-                    with open(item.face_image_path, "rb") as fh:
-                        crop_bytes = fh.read()
-                    encoding = encode_face_from_crop_bytes(crop_bytes)
-                    if encoding:
-                        student.face_encoding = json.dumps(encoding)
-                        logger.info("Encoding atualizado para aluno %s (id=%d)", student.name, student.id)
+                    import base64 as _b64
+                    if item.face_image_path.startswith('data:image'):
+                        # base64 data URL (novo fluxo — sem arquivo em disco)
+                        crop_bytes = _b64.b64decode(item.face_image_path.split(',')[1])
+                    elif os.path.exists(item.face_image_path):
+                        # caminho de arquivo (fluxo legado)
+                        with open(item.face_image_path, "rb") as fh:
+                            crop_bytes = fh.read()
+                    else:
+                        crop_bytes = None
+                    if crop_bytes:
+                        encoding = encode_face_from_crop_bytes(crop_bytes)
+                        if encoding:
+                            student.face_encoding = json.dumps(encoding)
+                            logger.info("Encoding atualizado para aluno %s (id=%d)", student.name, student.id)
                 except Exception as e:
                     logger.warning("Falha ao atualizar encoding do aluno %d: %s", item.student_id, e)
 
