@@ -36,6 +36,7 @@ async def detect_session(
     session_date: str = Form(default=""),
     schedule_id: int = Form(default=0),
     flexible_time: str = Form(default=""),
+    profile: str = Form(default=""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
@@ -44,22 +45,23 @@ async def detect_session(
     NÃO salva nada no banco — retorna um temp_id para uso em /confirm.
     """
     contents = await file.read()
-
-    # Salva foto do treino em local temporário (prefixo "tmp_")
-    photo_dir = os.path.join(UPLOAD_DIR, "sessions")
-    os.makedirs(photo_dir, exist_ok=True)
-    ext = os.path.splitext(file.filename or ".jpg")[1]
     temp_id = str(uuid.uuid4())
-    photo_path = os.path.join(photo_dir, f"tmp_{temp_id}{ext}")
-    with open(photo_path, "wb") as f:
-        f.write(contents)
 
-    # Alunos ativos com encoding
-    students = (
-        db.query(Student)
-        .filter(Student.active == True, Student.face_encoding.isnot(None))
-        .all()
-    )
+    # Resolve perfil: usa o do formulário ou herda do horário selecionado
+    effective_profile = profile.strip() or ""
+    if not effective_profile and schedule_id:
+        sched = db.get(ClassSchedule, schedule_id)
+        if sched and sched.profile:
+            effective_profile = sched.profile
+    # Professor/admin com profile_access sempre usa o seu perfil
+    if current_user.profile_access:
+        effective_profile = current_user.profile_access
+
+    # Alunos ativos com encoding — filtra por perfil se definido
+    q = db.query(Student).filter(Student.active == True, Student.face_encoding.isnot(None))
+    if effective_profile:
+        q = q.filter(Student.profile == effective_profile)
+    students = q.all()
     students_encodings = [(s.id, json.loads(s.face_encoding)) for s in students]
     students_map = {s.id: s for s in students}
 
@@ -96,13 +98,13 @@ async def detect_session(
 
     # Guarda metadados em memória para o /confirm
     _temp_sessions[temp_id] = {
-        "photo_path": photo_path,
         "session_date": session_date,
         "schedule_id": schedule_id,
         "flexible_time": flexible_time,
         "notes": notes,
         "professor_id": current_user.id,
         "school_id": current_user.school_id,
+        "profile": effective_profile,
     }
 
     return DetectResult(
@@ -110,6 +112,7 @@ async def detect_session(
         recognized=recognized,
         unidentified=unidentified,
         faces_detected=len(recognized) + len(unidentified),
+        profile=effective_profile or None,
     )
 
 
@@ -126,15 +129,6 @@ def confirm_session(
     temp = _temp_sessions.pop(data.temp_id, None)
     if not temp:
         raise HTTPException(400, "Sessão temporária não encontrada ou expirada. Reprocesse a foto.")
-
-    # Renomeia foto de temporária para definitiva
-    old_path: str = temp["photo_path"]
-    final_photo_path = old_path.replace(f"tmp_{data.temp_id}", data.temp_id) if f"tmp_{data.temp_id}" in old_path else old_path
-    try:
-        if old_path != final_photo_path:
-            os.rename(old_path, final_photo_path)
-    except Exception:
-        final_photo_path = old_path  # mantém o caminho original se rename falhar
 
     # Data da sessão
     parsed_date = date.today()
@@ -157,8 +151,8 @@ def confirm_session(
     session = TrainingSession(
         professor_id=temp["professor_id"],
         school_id=temp.get("school_id"),
+        profile=temp.get("profile") or None,
         date=parsed_date,
-        training_photo_path=final_photo_path,
         notes=temp.get("notes") or None,
         schedule_id=resolved_schedule_id,
         flexible_time=resolved_flexible,
@@ -340,21 +334,30 @@ def _session_to_out(s: TrainingSession) -> SessionOut:
 @router.get("", response_model=list[SessionOut])
 def list_sessions(
     student_name: str = "",
+    profile: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
     from app.models import UserRole
+
+    # Determina filtro de perfil efetivo
+    effective_profile = current_user.profile_access or profile
+
     q = db.query(TrainingSession)
     if current_user.school_id is not None:
         q = q.filter(TrainingSession.school_id == current_user.school_id)
+
     if student_name.strip():
-        # Filtra apenas sessões onde o aluno com esse nome tem presença
         q = (
             q.join(Attendance, Attendance.session_id == TrainingSession.id)
              .join(Student, Student.id == Attendance.student_id)
              .filter(Student.name.ilike(f"%{student_name.strip()}%"))
              .distinct()
         )
+    elif effective_profile:
+        # Filtra diretamente pelo perfil da sessão
+        q = q.filter(TrainingSession.profile == effective_profile)
+
     sessions = q.order_by(TrainingSession.date.desc()).all()
     return [_session_to_out(s) for s in sessions]
 

@@ -26,9 +26,10 @@ interface FormState {
   day_of_week: number
   start_time: string
   end_time: string
+  profile: string
 }
 
-const EMPTY_FORM: FormState = { day_of_week: 0, start_time: '20:00', end_time: '21:30' }
+const EMPTY_FORM: FormState = { day_of_week: 0, start_time: '20:00', end_time: '21:30', profile: '' }
 
 export default function SchedulesPage() {
   const [schedules, setSchedules] = useState<ClassSchedule[]>([])
@@ -55,7 +56,7 @@ export default function SchedulesPage() {
   }
 
   function openEdit(s: ClassSchedule) {
-    setForm({ day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time })
+    setForm({ day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time, profile: s.profile ?? '' })
     setEditId(s.id)
     setError('')
     setShowForm(true)
@@ -139,6 +140,16 @@ export default function SchedulesPage() {
               />
             </div>
           </div>
+          <div className="mt-3">
+            <label className="block text-sm font-medium mb-1">Perfil da turma</label>
+            <select className="input" value={form.profile}
+              onChange={(e) => setForm({ ...form, profile: e.target.value })}>
+              <option value="">— Sem perfil definido —</option>
+              <option value="adulto">Adulto</option>
+              <option value="infantil">Infantil</option>
+            </select>
+          </div>
+
           {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
           <div className="flex gap-3 mt-4">
             <button className="btn-secondary flex items-center gap-1" onClick={() => setShowForm(false)}>
@@ -179,6 +190,13 @@ export default function SchedulesPage() {
                       <span className="text-xs text-gray-400">
                         ({calcDuration(s.start_time, s.end_time)})
                       </span>
+                      {s.profile && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          s.profile === 'infantil' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {s.profile === 'infantil' ? 'Infantil' : 'Adulto'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-1">
                       <button

@@ -180,7 +180,7 @@ const nav: { to: string; icon: any; label: string; roles: Role[] }[] = [
   { to: '/schools',    icon: Building2,       label: 'Escolas',       roles: ['root'] },
   { to: '/users',      icon: UserCog,         label: 'Usuários',      roles: ['root', 'admin'] },
   { to: '/students',   icon: Users,           label: 'Alunos',        roles: ['root', 'admin', 'admin_especifico', 'professor'] },
-  { to: '/schedules',  icon: Clock,           label: 'Horários',      roles: ['root', 'admin', 'admin_especifico'] },
+  { to: '/schedules',  icon: Clock,           label: 'Horários',      roles: ['root', 'admin'] },
   { to: '/attendance', icon: Camera,          label: 'Chamada',       roles: ['root', 'admin', 'admin_especifico', 'professor'] },
   { to: '/sessions',   icon: ClipboardList,   label: 'Presenças',     roles: ['root', 'admin', 'admin_especifico', 'professor'] },
   { to: '/fees',       icon: DollarSign,      label: 'Mensalidades',  roles: ['root', 'admin', 'admin_especifico'] },

@@ -61,6 +61,8 @@ export default function UserForm({ user, schools, creatableRoles, currentUser, o
     },
   })
 
+  const isAlunoEdit = isEdit && user?.role === 'aluno'
+  const availableRoles = isAlunoEdit ? ['aluno'] as Role[] : creatableRoles
   const selectedRole = watch('role')
   const needsSchool = selectedRole !== 'root'
   const needsProfileAccess = selectedRole === 'admin_especifico' || selectedRole === 'professor'
@@ -152,11 +154,16 @@ export default function UserForm({ user, schools, creatableRoles, currentUser, o
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Perfil *</label>
-              <select className="input" {...register('role')}>
-                {creatableRoles.map((r) => (
+              <select className="input" disabled={isAlunoEdit} {...register('role')}>
+                {availableRoles.map((r) => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                 ))}
               </select>
+              {isAlunoEdit && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Alunos não podem ser promovidos aqui. Crie um novo usuário como Professor ou Admin.
+                </p>
+              )}
             </div>
 
             {needsSchool && (

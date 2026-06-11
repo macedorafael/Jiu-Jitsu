@@ -137,6 +137,7 @@ class ClassSchedule(Base):
     day_of_week: Mapped[int] = mapped_column(Integer)   # 0=Segunda … 6=Domingo
     start_time: Mapped[str] = mapped_column(String(5))   # "HH:MM"
     end_time: Mapped[str] = mapped_column(String(5))     # "HH:MM"
+    profile: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "adulto"|"infantil"
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -151,6 +152,7 @@ class TrainingSession(Base):
     school_id: Mapped[Optional[int]] = mapped_column(ForeignKey("schools.id"), nullable=True)
     schedule_id: Mapped[Optional[int]] = mapped_column(ForeignKey("class_schedules.id"), nullable=True)
     flexible_time: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    profile: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "adulto"|"infantil"
     date: Mapped[date] = mapped_column(Date, default=date.today)
     training_photo_path: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -367,6 +367,16 @@ function SessionRow({ session: initialSession, students, schedules, canEdit, onD
           </span>
         )}
 
+        {session.profile && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            session.profile === 'infantil'
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-orange-100 text-orange-700'
+          }`}>
+            {session.profile === 'infantil' ? 'Infantil' : 'Adulto'}
+          </span>
+        )}
+
         <span className="ml-auto flex-shrink-0 bg-primary-100 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full">
           {session.attendance_count} aluno{session.attendance_count !== 1 ? 's' : ''}
         </span>
@@ -846,6 +856,10 @@ export default function SessionsPage() {
   const [filterName, setFilterName] = useState('')
   const [debouncedName, setDebouncedName] = useState('')
   const [activePeriod, setActivePeriod] = useState<number | null>(null)
+  const [profileFilter, setProfileFilter] = useState<'all' | 'infantil' | 'adulto'>('all')
+
+  // Admin geral / root (sem profile_access) → mostra botões de filtro
+  const canFilterProfile = !user?.profile_access && (user?.role === 'admin' || user?.role === 'root')
 
   // Visão
   const [viewMode, setViewMode] = useState<'sessions' | 'students' | 'evolucao'>('sessions')
@@ -879,11 +893,11 @@ export default function SessionsPage() {
   }
 
   // Load sessions
-  const loadSessions = useCallback(async (nameFilter = '') => {
+  const loadSessions = useCallback(async (nameFilter = '', pf: 'all' | 'infantil' | 'adulto' = 'all') => {
     setLoading(true)
     try {
       const [{ data: sess }, { data: studs }, { data: scheds }] = await Promise.all([
-        attendanceApi.listSessions(nameFilter || undefined),
+        attendanceApi.listSessions(nameFilter || undefined, pf !== 'all' ? pf : undefined),
         studentsApi.list(),
         schedulesApi.list(),
       ])
@@ -895,8 +909,8 @@ export default function SessionsPage() {
     }
   }, [])
 
-  useEffect(() => { loadSessions() }, [loadSessions])
-  useEffect(() => { loadSessions(debouncedName) }, [debouncedName, loadSessions])
+  // Um único efeito para evitar race condition ao trocar filtro e nome simultaneamente
+  useEffect(() => { loadSessions(debouncedName, profileFilter) }, [debouncedName, profileFilter, loadSessions])
 
   // Load summary whenever view mode switches to 'students' or period changes
   useEffect(() => {
@@ -985,6 +999,29 @@ export default function SessionsPage() {
             </span>
           )}
         </div>
+
+        {/* Filtro de perfil — só para admin geral / root */}
+        {canFilterProfile && viewMode === 'sessions' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">Perfil:</span>
+            {(['all', 'infantil', 'adulto'] as const).map((p) => {
+              const labels = { all: 'Todos', infantil: 'Infantil', adulto: 'Adulto' }
+              const active = profileFilter === p
+              return (
+                <button
+                  key={p}
+                  onClick={() => setProfileFilter(p)}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                    active ? 'text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600'
+                  }`}
+                  style={active ? { backgroundColor: '#cc0000', borderColor: '#cc0000' } : {}}
+                >
+                  {labels[p]}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Filtros avançados */}
         <div className="flex flex-wrap items-end gap-3">

@@ -70,6 +70,7 @@ def require_roles(*roles: UserRole):
 
 # Helpers de acesso por perfil
 require_root         = require_roles(UserRole.root)
+require_admin_geral  = require_roles(UserRole.root, UserRole.admin)
 require_admin_up     = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico)
 require_professor_up = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico, UserRole.professor)
 require_any          = require_roles(UserRole.root, UserRole.admin, UserRole.admin_especifico, UserRole.professor, UserRole.aluno)

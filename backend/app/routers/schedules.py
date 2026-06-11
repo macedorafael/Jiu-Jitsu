@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ClassSchedule, User, UserRole
 from app.schemas import ClassScheduleCreate, ClassScheduleOut
-from app.auth import require_admin_up, require_professor_up
+from app.auth import require_admin_geral, require_professor_up
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
@@ -35,7 +35,7 @@ def list_schedules(
 def create_schedule(
     data: ClassScheduleCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_up),
+    current_user: User = Depends(require_admin_geral),
 ):
     """Cria um novo horário de aula."""
     # Verifica duplicidade: mesmo dia + horário de início na mesma escola
@@ -63,7 +63,7 @@ def update_schedule(
     schedule_id: int,
     data: ClassScheduleCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_up),
+    current_user: User = Depends(require_admin_geral),
 ):
     """Atualiza um horário de aula."""
     schedule = db.get(ClassSchedule, schedule_id)
@@ -83,7 +83,7 @@ def update_schedule(
 def delete_schedule(
     schedule_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_up),
+    current_user: User = Depends(require_admin_geral),
 ):
     """Desativa um horário de aula."""
     schedule = db.get(ClassSchedule, schedule_id)

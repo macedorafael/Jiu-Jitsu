@@ -149,12 +149,14 @@ export interface ClassSchedule {
   day_of_week: number   // 0=Segunda … 6=Domingo
   start_time: string    // "HH:MM"
   end_time: string      // "HH:MM"
+  profile?: StudentProfile
   active: boolean; created_at: string
 }
 
 export interface Session {
   id: number; professor_id: number; professor_name?: string; date: string; notes?: string
   schedule_id?: number; schedule_info?: string; flexible_time?: string
+  profile?: StudentProfile
   training_photo_path?: string; created_at: string; attendance_count: number
 }
 
@@ -264,8 +266,13 @@ export const attendanceApi = {
     if (flexibleTime) form.append('flexible_time', flexibleTime)
     return api.post<SessionResult>('/sessions', form)
   },
-  listSessions: (studentName?: string) =>
-    api.get<Session[]>('/sessions', { params: studentName ? { student_name: studentName } : {} }),
+  listSessions: (studentName?: string, profile?: string) =>
+    api.get<Session[]>('/sessions', {
+      params: {
+        ...(studentName ? { student_name: studentName } : {}),
+        ...(profile ? { profile } : {}),
+      }
+    }),
   getSession: (id: number) => api.get<SessionResult>(`/sessions/${id}`),
   identifyFace: (sessionId: number, faceId: number, studentId: number) =>
     api.post<{ ok: boolean; student_name: string; photo_saved: boolean }>(
@@ -291,7 +298,7 @@ export const attendanceApi = {
     session_date?: string; notes?: string; schedule_id?: number; flexible_time?: string
   }) => api.put<Session>(`/sessions/${sessionId}`, data),
   detectFaces: (
-    file: File, notes?: string, date?: string, scheduleId?: number, flexibleTime?: string,
+    file: File, notes?: string, date?: string, scheduleId?: number, flexibleTime?: string, profile?: string,
   ) => {
     const form = new FormData()
     form.append('file', file)
@@ -299,6 +306,7 @@ export const attendanceApi = {
     if (date) form.append('session_date', date)
     if (scheduleId) form.append('schedule_id', scheduleId.toString())
     if (flexibleTime) form.append('flexible_time', flexibleTime)
+    if (profile) form.append('profile', profile)
     return api.post<DetectResult>('/sessions/detect', form)
   },
   confirmSession: (tempId: string, attendance: ConfirmAttendanceItem[]) =>

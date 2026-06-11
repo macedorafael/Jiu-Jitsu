@@ -8,6 +8,7 @@ import {
   attendanceApi, schedulesApi, studentsApi,
   ClassSchedule, Student, TempRecognized, TempUnidentified, ConfirmAttendanceItem,
 } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import { todayBR } from '../../utils/dateUtils'
 
 const DAYS = [
@@ -238,6 +239,7 @@ function UnidentifiedCard({
 type Phase = 'idle' | 'detecting' | 'review' | 'confirming' | 'success'
 
 export default function AttendancePage() {
+  const { user } = useAuth()
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState('')
 
@@ -250,6 +252,10 @@ export default function AttendancePage() {
   const [scheduleId, setScheduleId] = useState<number>(0)
   const [useFlexible, setUseFlexible] = useState(false)
   const [flexibleTime, setFlexibleTime] = useState('')
+  const [sessionProfile, setSessionProfile] = useState<string>('')
+
+  // Perfil do usuário logado (professor/admin com perfil restrito)
+  const lockedProfile = user?.profile_access ?? null
 
   // Detecção
   const [tempId, setTempId] = useState<string | null>(null)
@@ -290,8 +296,9 @@ export default function AttendancePage() {
     try {
       const sid = useFlexible ? undefined : (scheduleId > 0 ? scheduleId : undefined)
       const flex = useFlexible ? flexibleTime.trim() || undefined : undefined
+      const prof = (lockedProfile ?? sessionProfile) || undefined
       const [{ data: detect }, { data: studs }] = await Promise.all([
-        attendanceApi.detectFaces(f, notes || undefined, sessionDate, sid, flex),
+        attendanceApi.detectFaces(f, notes || undefined, sessionDate, sid, flex, prof),
         studentsApi.list(),
       ])
       setStudents(studs)
@@ -471,15 +478,38 @@ export default function AttendancePage() {
               </div>
             ) : (
               <select className="input" value={scheduleId}
-                onChange={(e) => setScheduleId(Number(e.target.value))}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  setScheduleId(id)
+                  // Auto-preenche perfil a partir do horário selecionado
+                  const sched = schedules.find(s => s.id === id)
+                  setSessionProfile(sched?.profile ?? '')
+                }}
                 disabled={formLocked || phase === 'review'}>
                 <option value={0}>— Horário cadastrado (opcional) —</option>
                 {grouped.map(({ day, items }) =>
                   items.map((s) => (
-                    <option key={s.id} value={s.id}>{day} · {s.start_time}–{s.end_time}</option>
+                    <option key={s.id} value={s.id}>
+                      {day} · {s.start_time}–{s.end_time}
+                      {s.profile ? ` (${s.profile === 'infantil' ? 'Infantil' : 'Adulto'})` : ''}
+                    </option>
                   ))
                 )}
               </select>
+            )}
+
+            {/* Seletor de perfil — oculto para usuários com perfil restrito */}
+            {!lockedProfile && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Perfil da turma</label>
+                <select className="input" value={sessionProfile}
+                  onChange={(e) => setSessionProfile(e.target.value)}
+                  disabled={formLocked || phase === 'review'}>
+                  <option value="">— Sem perfil definido —</option>
+                  <option value="adulto">Adulto</option>
+                  <option value="infantil">Infantil</option>
+                </select>
+              </div>
             )}
           </div>
 

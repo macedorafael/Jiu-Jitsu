@@ -212,6 +212,7 @@ class ClassScheduleCreate(BaseModel):
     day_of_week: int   # 0=Segunda … 6=Domingo
     start_time: str    # "HH:MM"
     end_time: str      # "HH:MM"
+    profile: Optional[str] = None  # "adulto"|"infantil"
 
     @field_validator("day_of_week")
     @classmethod
@@ -235,6 +236,7 @@ class ClassScheduleOut(BaseModel):
     day_of_week: int
     start_time: str
     end_time: str
+    profile: Optional[str] = None
     active: bool
     created_at: datetime
 
@@ -290,6 +292,7 @@ class SessionOut(BaseModel):
     schedule_id: Optional[int] = None
     schedule_info: Optional[str] = None     # "Segunda 20:00–21:30"
     flexible_time: Optional[str] = None
+    profile: Optional[str] = None           # "adulto"|"infantil"
     training_photo_path: Optional[str] = None
     created_at: datetime
     attendance_count: int = 0
@@ -335,6 +338,7 @@ class DetectResult(BaseModel):
     recognized: list[TempRecognizedOut]
     unidentified: list[TempUnidentifiedOut]
     faces_detected: int
+    profile: Optional[str] = None  # perfil resolvido da sessão
 
 
 class ConfirmAttendanceItem(BaseModel):
