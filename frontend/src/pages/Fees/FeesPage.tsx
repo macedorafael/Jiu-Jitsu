@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { DollarSign, Plus, CheckCircle, Clock, AlertCircle, Search, AlertTriangle, XCircle } from 'lucide-react'
 import { studentsApi, feesApi, financeiroApi, Student, FeePlan, Payment, FinancialPayment } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { currentMonthBR } from '../../utils/dateUtils'
@@ -19,6 +20,12 @@ const months = Array.from({ length: 12 }, (_, i) => {
 })
 
 export default function FeesPage() {
+  const { user } = useAuth()
+
+  // Perfil: admin_especifico com profile_access fica bloqueado no seu perfil
+  const lockedProfile = user?.profile_access ?? null
+  const canFilterProfile = !lockedProfile && (user?.role === 'admin' || user?.role === 'root')
+
   const [students, setStudents]       = useState<Student[]>([])
   const [search, setSearch]           = useState('')
   const [selected, setSelected]       = useState<Student | null>(null)
@@ -30,11 +37,15 @@ export default function FeesPage() {
   const [showPayForm, setShowPayForm] = useState(false)
   const [saving, setSaving]           = useState(false)
 
-  // Filtro: 'all' | 'pending' | 'overdue'
+  // Filtro de status: 'all' | 'pending' | 'overdue'
   const [filter, setFilter]                       = useState<'all' | 'pending' | 'overdue'>('all')
   const [pendingStudentIds, setPendingStudentIds] = useState<Set<number>>(new Set())
   const [overdueStudentIds, setOverdueStudentIds] = useState<Set<number>>(new Set())
   const [loadingPending, setLoadingPending]       = useState(false)
+
+  // Filtro de perfil (só para admin geral / root)
+  const [profileFilter, setProfileFilter] = useState<'all' | 'adulto' | 'infantil'>('all')
+  const effectiveProfile = lockedProfile ?? (profileFilter === 'all' ? undefined : profileFilter)
 
   // Ref para scroll automático ao formulário de pagamento
   const payFormRef = useRef<HTMLDivElement>(null)
@@ -47,15 +58,15 @@ export default function FeesPage() {
     setLoadingPending(true)
     try {
       const [{ data: overdue }, { data: pending }] = await Promise.all([
-        financeiroApi.payments({ month: CURRENT_MONTH, status: 'overdue' }),
-        financeiroApi.payments({ month: CURRENT_MONTH, status: 'pending' }),
+        financeiroApi.payments({ month: CURRENT_MONTH, status: 'overdue', profile: effectiveProfile }),
+        financeiroApi.payments({ month: CURRENT_MONTH, status: 'pending', profile: effectiveProfile }),
       ])
       setPendingStudentIds(new Set(pending.map((p: FinancialPayment) => p.student_id)))
       setOverdueStudentIds(new Set(overdue.map((p: FinancialPayment) => p.student_id)))
     } finally {
       setLoadingPending(false)
     }
-  }, [])
+  }, [effectiveProfile])
 
   useEffect(() => {
     if (filter !== 'all') loadFiltered()
@@ -117,9 +128,10 @@ export default function FeesPage() {
   // Lista filtrada de alunos
   const displayedStudents = students.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase())
-    if (filter === 'pending') return matchSearch && pendingStudentIds.has(s.id)
-    if (filter === 'overdue') return matchSearch && overdueStudentIds.has(s.id)
-    return matchSearch
+    const matchProfile = effectiveProfile ? s.profile === effectiveProfile : true
+    if (filter === 'pending') return matchSearch && matchProfile && pendingStudentIds.has(s.id)
+    if (filter === 'overdue') return matchSearch && matchProfile && overdueStudentIds.has(s.id)
+    return matchSearch && matchProfile
   })
 
   const pendingCount = pendingStudentIds.size
@@ -134,7 +146,28 @@ export default function FeesPage() {
         <div className="card p-0 overflow-hidden">
           <div className="p-4 border-b bg-gray-50 space-y-3">
 
-            {/* Filtro */}
+            {/* Filtro de perfil — só para admin geral e root */}
+            {canFilterProfile && (
+              <div className="flex gap-1.5">
+                {(['all', 'adulto', 'infantil'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setProfileFilter(p); setSelected(null) }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      profileFilter === p
+                        ? p === 'adulto'   ? 'bg-orange-500 text-white'
+                        : p === 'infantil' ? 'bg-blue-500 text-white'
+                        :                   'bg-gray-700 text-white'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {p === 'all' ? 'Todos' : p === 'adulto' ? 'Adulto' : 'Infantil'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Filtro de status */}
             <div className="flex gap-1.5">
               <button
                 onClick={() => setFilter('all')}
