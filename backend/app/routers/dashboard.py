@@ -143,9 +143,11 @@ def get_dashboard(
     overdue_count = 0
     pending_count = 0
     if current_user.role in [UserRole.admin, UserRole.root, UserRole.admin_especifico]:
-        fp_q = db.query(FeePayment)
+        fp_q = db.query(FeePayment).join(Student).filter(Student.active == True)
         if school_id:
-            fp_q = fp_q.join(Student).filter(Student.school_id == school_id)
+            fp_q = fp_q.filter(Student.school_id == school_id)
+        if effective_profile:
+            fp_q = fp_q.filter(Student.profile == effective_profile)
         overdue_count = fp_q.filter(FeePayment.status == FeeStatus.overdue).count()
         pending_count = fp_q.filter(FeePayment.status == FeeStatus.pending).count()
 
