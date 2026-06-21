@@ -135,14 +135,25 @@ def get_belt_progress(
 
     result = []
     for student in students:
-        # Data de referência: última promoção de faixa (não grau) ou matrícula
-        last_belt_change = (
+        # Data de referência: primeira vez que o aluno recebeu a COR da faixa atual
+        # (graus/listras dentro da mesma faixa não reiniciam o contador)
+        history = (
             db.query(BeltHistory)
             .filter(BeltHistory.student_id == student.id)
-            .order_by(BeltHistory.awarded_date.desc())
-            .first()
+            .order_by(BeltHistory.awarded_date.asc())
+            .all()
         )
-        since_date: date = last_belt_change.awarded_date if last_belt_change else student.enrollment_date
+        since_date: date = student.enrollment_date
+        if history:
+            # Encontra o índice da última entrada com uma faixa DIFERENTE da atual
+            last_diff_idx = -1
+            for i, h in enumerate(history):
+                if h.belt != student.belt:
+                    last_diff_idx = i
+            # A cor atual começou na entrada logo após a última faixa diferente
+            start_idx = last_diff_idx + 1
+            if start_idx < len(history):
+                since_date = history[start_idx].awarded_date
 
         # Conta presenças desde essa data
         att_count = (
