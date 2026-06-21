@@ -314,9 +314,9 @@ export const attendanceApi = {
       '/sessions/confirm',
       { temp_id: tempId, attendance },
     ),
-  studentSummary: (fromDate?: string, toDate?: string) =>
+  studentSummary: (fromDate?: string, toDate?: string, profile?: string) =>
     api.get<StudentAttendanceSummary[]>('/sessions/student-summary', {
-      params: { from_date: fromDate, to_date: toDate },
+      params: { from_date: fromDate, to_date: toDate, profile },
     }),
 }
 

@@ -366,6 +366,7 @@ def list_sessions(
 def student_attendance_summary(
     from_date: str = "",
     to_date: str = "",
+    profile: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(require_professor_up),
 ):
@@ -389,9 +390,11 @@ def student_attendance_summary(
     if current_user.school_id is not None:
         q = q.filter(TrainingSession.school_id == current_user.school_id)
 
-    # Professor ou admin_especifico com perfil restrito — filtra por perfil
+    # Perfil restrito pelo papel do usuário tem precedência
     if current_user.profile_access and current_user.role in (UserRole.professor, UserRole.admin_especifico):
         q = q.filter(Student.profile == current_user.profile_access)
+    elif profile in ("adulto", "infantil"):
+        q = q.filter(Student.profile == profile)
 
     if from_date:
         try:

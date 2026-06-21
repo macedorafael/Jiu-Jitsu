@@ -916,11 +916,12 @@ export default function SessionsPage() {
   useEffect(() => {
     if (viewMode !== 'students') return
     setSummaryLoading(true)
-    attendanceApi.studentSummary(filterFrom || undefined, filterTo || undefined)
+    const prof = profileFilter !== 'all' ? profileFilter : undefined
+    attendanceApi.studentSummary(filterFrom || undefined, filterTo || undefined, prof)
       .then(({ data }) => setSummary(data))
       .catch(() => setSummary([]))
       .finally(() => setSummaryLoading(false))
-  }, [viewMode, filterFrom, filterTo])
+  }, [viewMode, filterFrom, filterTo, profileFilter])
 
   // Filtros locais de data para a lista de sessões
   const filtered = sessions.filter((s) => {
@@ -1001,7 +1002,7 @@ export default function SessionsPage() {
         </div>
 
         {/* Filtro de perfil — só para admin geral / root */}
-        {canFilterProfile && viewMode === 'sessions' && (
+        {canFilterProfile && viewMode !== 'evolucao' && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-gray-500">Perfil:</span>
             {(['all', 'infantil', 'adulto'] as const).map((p) => {
