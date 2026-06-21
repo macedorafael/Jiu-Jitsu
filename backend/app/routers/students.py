@@ -143,20 +143,14 @@ def get_belt_progress(
             .order_by(BeltHistory.awarded_date.asc())
             .all()
         )
-        # Data de referência: quando o aluno recebeu a COR da faixa atual pela primeira vez.
-        # Se o histórico só tem graus da cor atual (sem troca de cor), usa enrollment_date.
+        # Data de referência: entrada mais recente com belt==atual e degree==0 (= promoção de cor).
+        # Se não existe (aluno entrou já nessa faixa, sem registro formal), usa enrollment_date.
         since_date: date = student.enrollment_date
         if history:
-            last_diff_idx = -1
-            for i, h in enumerate(history):
-                if h.belt != student.belt:
-                    last_diff_idx = i
-            if last_diff_idx >= 0:
-                # Houve troca de cor: conta a partir da primeira entrada da cor atual após a última diferente
-                start_idx = last_diff_idx + 1
-                if start_idx < len(history):
-                    since_date = history[start_idx].awarded_date
-            # Se last_diff_idx == -1: todo histórico é da cor atual (só graus) → usa enrollment_date
+            for h in reversed(history):
+                if h.belt == student.belt and h.degree == 0:
+                    since_date = h.awarded_date
+                    break
 
         # Conta presenças desde essa data
         att_count = (

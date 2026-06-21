@@ -98,17 +98,12 @@ def get_dashboard(
         'green_white': 'green', 'green': 'green_black', 'green_black': 'blue',
     }
 
-    history_sorted = sorted(student.belt_history, key=lambda x: x.awarded_date)
+    history_sorted = sorted(student.belt_history, key=lambda x: x.awarded_date, reverse=True)
     since_date = student.enrollment_date
-    if history_sorted:
-        last_diff_idx = -1
-        for i, h in enumerate(history_sorted):
-            if h.belt != student.belt:
-                last_diff_idx = i
-        if last_diff_idx >= 0:
-            start_idx = last_diff_idx + 1
-            if start_idx < len(history_sorted):
-                since_date = history_sorted[start_idx].awarded_date
+    for h in history_sorted:
+        if h.belt == student.belt and h.degree == 0:
+            since_date = h.awarded_date
+            break
     att_since_count = sum(1 for a in student.attendance if a.session.date >= since_date)
 
     belt_val = str(student.belt.value)
